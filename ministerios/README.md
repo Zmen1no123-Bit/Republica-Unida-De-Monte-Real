@@ -8,5 +8,6 @@ Esta pasta reúne a descrição dos ministérios e suas competências comunitár
 - Relações Exteriores
 - Infraestrutura
 - Comunicação
+- [Ministério da Migração](migracao.md) — análise de pedidos de ingresso
 
 Ao nomear responsáveis, publique somente informações que eles autorizaram divulgar.
