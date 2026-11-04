@@ -7,7 +7,8 @@ O site é publicado pelo GitHub Pages (quando habilitado nas configurações do 
 
 ## Estrutura
 - `index.html`, `style.css`, `script.js`: portal público.
-- `cadastro.html`, `login.html`, `verificar.html`, `painel.html` e `auth.js`: primeira etapa de autenticação Appwrite.
+- `cadastro.html`, `login.html`, `verificar.html`, `painel.html`, `solicitar-ingresso.html` e `auth.js`: autenticação e solicitação de ingresso Appwrite.
+- `APPWRITE_MEMBROS.md`: instruções para criar o banco e configurar as permissões das solicitações.
 - `documentos/`: Constituição, modelos de decretos e regimentos.
 - `ministerios/`: estrutura ministerial.
 - `instituicoes/`: estatutos da Presidência, Congresso unicameral e Supremo Tribunal.
