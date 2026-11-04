@@ -4,6 +4,24 @@
 (() => {
   "use strict";
 
+  const byId = (id) => document.getElementById(id);
+  const showMessage = (message, type = "info") => {
+    const el = byId("authMessage");
+    if (!el) return;
+    el.textContent = message;
+    el.dataset.type = type;
+  };
+
+  // Mostra um diagnóstico visível caso o SDK não tenha carregado.
+  if (!window.Appwrite) {
+    showMessage("O serviço de autenticação não carregou. Atualize a página e tente novamente.", "error");
+    return;
+  }
+  if (!Appwrite.Client || !Appwrite.Account || !Appwrite.TablesDB) {
+    showMessage("A versão do serviço de autenticação é incompatível. Avise a administração.", "error");
+    return;
+  }
+
   const PROJECT_ID = "6aeb2aec002a69ad90ef";
   const ENDPOINT = "https://fra.cloud.appwrite.io/v1";
   const APP_URL = "https://zmen1no123-bit.github.io/Republica-Unida-De-Monte-Real/";
@@ -16,14 +34,6 @@
   const tablesDB = new Appwrite.TablesDB(client);
   const DATABASE_ID = "rumr_main";
   const REQUESTS_TABLE_ID = "membership_requests";
-
-  const byId = (id) => document.getElementById(id);
-  const showMessage = (message, type = "info") => {
-    const el = byId("authMessage");
-    if (!el) return;
-    el.textContent = message;
-    el.dataset.type = type;
-  };
   const friendlyError = (error) => {
     const code = error && error.code;
     if (code === 409) return "Este e-mail já possui uma conta. Tente entrar.";
