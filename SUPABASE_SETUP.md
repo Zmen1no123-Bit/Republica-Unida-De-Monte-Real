@@ -33,8 +33,8 @@ O script cria:
 
 ## 4. Criar a primeira conta administradora
 
-1. Cadastre seu próprio e-mail no formulário de autenticação que será integrado ao site e confirme o e-mail.
-2. No Supabase, abra **SQL Editor** e execute a consulta abaixo, substituindo o texto de exemplo pelo e-mail da conta que você acabou de confirmar:
+1. Como a tela de cadastro do portal ainda será conectada, crie a primeira conta pelo Dashboard: **Authentication → Users → Add user**. Use um e-mail seu e uma senha forte; confirme a conta conforme as opções exibidas.
+2. O gatilho criado pela migração deve gerar automaticamente um perfil pendente. Abra **SQL Editor** e execute a consulta abaixo, substituindo o texto de exemplo pelo e-mail da conta que acabou de criar:
 
 ```sql
 update public.profiles p
@@ -56,6 +56,8 @@ Não publique seu e-mail pessoal, senha ou chaves no repositório.
 2. Copie a **Project URL** e a chave **publishable** (começa com `sb_publishable_`). Projetos antigos podem exibir a chave `anon`.
 3. A URL e a chave publishable podem ser usadas no navegador quando as políticas RLS estão corretas.
 4. Nunca copie uma chave **secret** ou a antiga `service_role` para HTML, JavaScript, GitHub Pages ou qualquer repositório público. Elas ignoram as políticas RLS.
+
+Até a tela de cadastro/login ser integrada ao site, não existe formulário público funcional: crie contas de teste pelo Dashboard e não divulgue o painel administrativo.
 
 ## 6. Como será a aprovação
 
