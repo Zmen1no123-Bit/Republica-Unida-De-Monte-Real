@@ -15,6 +15,8 @@ create table if not exists public.profiles (
 );
 
 alter table public.profiles enable row level security;
+revoke all on table public.profiles from anon, authenticated;
+grant select on table public.profiles to authenticated;
 
 create or replace function public.current_rumr_role()
 returns text
@@ -124,6 +126,9 @@ create table if not exists public.decrees (
 );
 
 alter table public.decrees enable row level security;
+revoke all on table public.decrees from anon, authenticated;
+grant select on table public.decrees to anon, authenticated;
+grant insert, update on table public.decrees to authenticated;
 
 create policy "Public reads published decrees"
 on public.decrees for select
