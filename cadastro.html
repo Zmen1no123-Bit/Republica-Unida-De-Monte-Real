@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#111111"><meta name="robots" content="noindex,nofollow">
+<title>Cadastro • RUMR</title><link rel="stylesheet" href="style.css">
+</head>
+<body class="auth-page">
+<header class="top"><a class="brand" href="index.html"><span class="seal">R</span><span><b>REPÚBLICA UNIDA</b><small>DE MONTE REAL</small></span></a><a class="back" href="index.html">← Voltar ao portal</a></header>
+<main class="auth-wrap">
+  <section class="auth-card">
+    <p class="eyebrow">PARTICIPAÇÃO VOLUNTÁRIA</p>
+    <h1>Criar <em>conta</em></h1>
+    <p class="auth-intro">Cadastre uma conta para participar da comunidade fictícia RUMR. O cadastro não concede cargo nem poderes administrativos.</p>
+    <form id="signupForm">
+      <div class="field"><label for="name">Nome de exibição</label><input id="name" name="name" maxlength="60" autocomplete="name" required placeholder="Como deseja ser chamado?"></div>
+      <div class="field"><label for="email">E-mail</label><input id="email" name="email" type="email" autocomplete="email" required placeholder="voce@exemplo.com"></div>
+      <div class="field"><label for="password">Senha</label><input id="password" name="password" type="password" minlength="8" maxlength="256" autocomplete="new-password" required placeholder="Mínimo de 8 caracteres"></div>
+      <div class="field"><label for="confirmPassword">Confirmar senha</label><input id="confirmPassword" name="confirmPassword" type="password" minlength="8" maxlength="256" autocomplete="new-password" required placeholder="Digite a senha novamente"></div>
+      <label class="auth-consent"><input id="consent" type="checkbox" required> Entendo que a RUMR é uma comunidade fictícia e voluntária, sem soberania ou autoridade legal estatal.</label>
+      <button class="admin-btn auth-submit" type="submit">Criar minha conta</button>
+      <p id="authMessage" class="auth-message" role="status" aria-live="polite"></p>
+    </form>
+    <p class="auth-switch">Já possui uma conta? <a href="login.html">Entrar</a></p>
+  </section>
+</main>
+<footer><div class="footer-brand"><span class="seal small">R</span><b>REPÚBLICA UNIDA DE MONTE REAL</b></div><p>Portal institucional de uma comunidade fictícia e voluntária.</p></footer>
+<script src="https://cdn.jsdelivr.net/npm/appwrite@17.0.0"></script><script src="auth.js"></script>
+</body></html>
