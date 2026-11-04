@@ -13,9 +13,9 @@
     .setEndpoint(ENDPOINT)
     .setProject(PROJECT_ID);
   const account = new Appwrite.Account(client);
-  const databases = new Appwrite.Databases(client);
+  const tablesDB = new Appwrite.TablesDB(client);
   const DATABASE_ID = "rumr_main";
-  const REQUESTS_COLLECTION_ID = "membership_requests";
+  const REQUESTS_TABLE_ID = "membership_requests";
 
   const byId = (id) => document.getElementById(id);
   const showMessage = (message, type = "info") => {
@@ -124,7 +124,6 @@
     }
   }
 
-
   const requestForm = byId("membershipForm");
   if (requestForm) {
     requestForm.addEventListener("submit", async (event) => {
@@ -132,8 +131,8 @@
       const submit = requestForm.querySelector('button[type="submit"]');
       const displayName = byId("requestDisplayName").value.trim();
       const motivation = byId("requestMotivation").value.trim();
-      if (displayName.length < 2 || motivation.length < 10) {
-        showMessage("Informe um nome de exibição e uma mensagem de pelo menos 10 caracteres.", "error");
+      if (displayName.length < 2 || displayName.length > 60 || motivation.length < 10 || motivation.length > 500) {
+        showMessage("Use um nome de 2 a 60 caracteres e uma mensagem de 10 a 500 caracteres.", "error");
         return;
       }
       submit.disabled = true;
@@ -144,20 +143,20 @@
           showMessage("Verifique seu e-mail antes de enviar a solicitação.", "error");
           return;
         }
-        await databases.createDocument(
-          DATABASE_ID,
-          REQUESTS_COLLECTION_ID,
-          Appwrite.ID.unique(),
-          { displayName, motivation },
-          [Appwrite.Permission.read(Appwrite.Role.user(user.$id))]
-        );
+        await tablesDB.createRow({
+          databaseId: DATABASE_ID,
+          tableId: REQUESTS_TABLE_ID,
+          rowId: Appwrite.ID.unique(),
+          data: { displayName, motivation },
+          permissions: [Appwrite.Permission.read(Appwrite.Role.user(user.$id))]
+        });
         showMessage("Solicitação enviada! Ela ficará disponível para análise. Criar uma conta não significa aprovação automática.", "success");
         requestForm.reset();
         submit.textContent = "Solicitação enviada";
       } catch (error) {
         console.error("RUMR membership request error:", error);
         if (error && (error.code === 404 || error.code === 401 || error.code === 403)) {
-          showMessage("Não foi possível enviar. A base pode ainda não estar configurada ou as permissões precisam ser revisadas.", "error");
+          showMessage("Não foi possível enviar. Confira se a tabela, as colunas e as permissões estão configuradas corretamente.", "error");
         } else {
           showMessage("Falha ao enviar a solicitação. Confira sua conexão e tente novamente.", "error");
         }
