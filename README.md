@@ -7,17 +7,17 @@ O site é publicado pelo GitHub Pages (quando habilitado nas configurações do 
 
 ## Estrutura
 - `index.html`, `style.css`, `script.js`: portal público.
-- `admin.html`, `admin.js`: protótipo de painel administrativo.
+- `cadastro.html`, `login.html`, `verificar.html`, `painel.html` e `auth.js`: primeira etapa de autenticação Appwrite.
 - `documentos/`: Constituição, modelos de decretos e regimentos.
 - `ministerios/`: estrutura ministerial.
 - `instituicoes/`: estatutos da Presidência, Congresso unicameral e Supremo Tribunal.
 - `documento.html` e `documento.js`: visualizador formatado de documentos Markdown.
-- `SUPABASE_SETUP.md` e `supabase/migrations/`: guia e base SQL para autenticação, aprovação manual e decretos.
+- `admin.html`, `admin.js`: protótipo local de gestão, ainda sem publicação segura.
 
 ## Painel administrativo — atenção
 O painel atual é apenas um protótipo estático. Ele salva rascunhos no armazenamento local do navegador e permite baixar arquivos Markdown. Não publica documentos no GitHub automaticamente e não possui autenticação segura. Não trate o endereço do painel como privado.
 
-Para habilitar publicação segura diretamente pelo painel, será necessária uma camada de servidor com autenticação (por exemplo, Supabase Auth + Edge Function) e credenciais guardadas exclusivamente no servidor. Nunca coloque um token pessoal do GitHub em HTML ou JavaScript público.
+A autenticação inicial usa Appwrite Auth pelo SDK Web. O endpoint e o Project ID são identificadores públicos; nenhuma API key administrativa deve ser colocada no frontend. A aprovação de participantes, cargos e operações administrativas exigirá regras de permissão e lógica confiável no servidor antes de ser ativada. Nunca coloque um token pessoal do GitHub em HTML ou JavaScript público.
 
 ## Natureza dos documentos
 Este projeto organiza uma comunidade fictícia. Seus documentos são registros internos e não possuem força de lei estatal nem substituem a legislação brasileira.
