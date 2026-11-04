@@ -13,6 +13,9 @@
     .setEndpoint(ENDPOINT)
     .setProject(PROJECT_ID);
   const account = new Appwrite.Account(client);
+  const databases = new Appwrite.Databases(client);
+  const DATABASE_ID = "rumr_main";
+  const REQUESTS_COLLECTION_ID = "membership_requests";
 
   const byId = (id) => document.getElementById(id);
   const showMessage = (message, type = "info") => {
@@ -119,6 +122,49 @@
           showMessage("Não foi possível validar este link. Ele pode ter expirado ou já ter sido utilizado. Entre na sua conta e solicite outro.", "error");
         });
     }
+  }
+
+
+  const requestForm = byId("membershipForm");
+  if (requestForm) {
+    requestForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const submit = requestForm.querySelector('button[type="submit"]');
+      const displayName = byId("requestDisplayName").value.trim();
+      const motivation = byId("requestMotivation").value.trim();
+      if (displayName.length < 2 || motivation.length < 10) {
+        showMessage("Informe um nome de exibição e uma mensagem de pelo menos 10 caracteres.", "error");
+        return;
+      }
+      submit.disabled = true;
+      showMessage("Enviando sua solicitação…");
+      try {
+        const user = await account.get();
+        if (!user.emailVerification) {
+          showMessage("Verifique seu e-mail antes de enviar a solicitação.", "error");
+          return;
+        }
+        await databases.createDocument(
+          DATABASE_ID,
+          REQUESTS_COLLECTION_ID,
+          Appwrite.ID.unique(),
+          { displayName, motivation },
+          [Appwrite.Permission.read(Appwrite.Role.user(user.$id))]
+        );
+        showMessage("Solicitação enviada! Ela ficará disponível para análise. Criar uma conta não significa aprovação automática.", "success");
+        requestForm.reset();
+        submit.textContent = "Solicitação enviada";
+      } catch (error) {
+        console.error("RUMR membership request error:", error);
+        if (error && (error.code === 404 || error.code === 401 || error.code === 403)) {
+          showMessage("Não foi possível enviar. A base pode ainda não estar configurada ou as permissões precisam ser revisadas.", "error");
+        } else {
+          showMessage("Falha ao enviar a solicitação. Confira sua conexão e tente novamente.", "error");
+        }
+      } finally {
+        submit.disabled = submit.textContent === "Solicitação enviada";
+      }
+    });
   }
 
   const logoutBtn = byId("logoutBtn");
