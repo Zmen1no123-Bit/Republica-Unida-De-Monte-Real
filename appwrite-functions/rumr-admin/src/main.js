@@ -50,13 +50,13 @@ export default async ({ req, res, log, error }) => {
     }
 
     // A chave efêmera é fornecida pelo Appwrite somente no ambiente da Function.
-    log("DIAG 5: verificando chave efêmera");
-const functionKey = process.env.APPWRITE_FUNCTION_API_KEY;
+    log("DIAG 5: verificando chave de serviço");
+const functionKey = process.env.APPWRITE_API_KEY || req.headers["x-appwrite-key"];
 if (!functionKey) {
-  error("Missing APPWRITE_FUNCTION_API_KEY environment variable.");
-  return json(res, 500, { ok: false, message: "O Appwrite não forneceu a chave temporária para esta execução." });
+  error("Missing service key: defina APPWRITE_API_KEY nas variáveis da Function.");
+  return json(res, 500, { ok: false, message: "A chave de serviço da função não está configurada." });
 }
-
+    
     const serviceClient = new Client()
       .setEndpoint(ENDPOINT)
       .setProject(PROJECT_ID)
