@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Solicitar ingresso • RUMR</title><link rel="stylesheet" href="style.css"></head>
+<body class="auth-page">
+<header class="top"><a class="brand" href="index.html"><span class="seal">R</span><span><b>REPÚBLICA UNIDA</b><small>DE MONTE REAL</small></span></a><a class="back" href="painel.html">← Minha área</a></header>
+<main class="auth-wrap"><section class="auth-card">
+<p class="eyebrow">MINISTÉRIO DA MIGRAÇÃO • CADASTRO COMUNITÁRIO</p><h1>Solicitar <em>ingresso</em></h1>
+<p class="auth-intro">Apresente sua solicitação de participação voluntária na comunidade fictícia RUMR. Não informe endereço, documentos, telefone ou dados sensíveis.</p>
+<form id="membershipForm">
+<div class="field"><label for="requestDisplayName">Nome de exibição</label><input id="requestDisplayName" maxlength="60" required placeholder="Nome que deseja usar na comunidade"></div>
+<div class="field"><label for="requestMotivation">Por que deseja participar?</label><textarea id="requestMotivation" maxlength="500" minlength="10" required placeholder="Conte brevemente o que gostaria de fazer na comunidade."></textarea></div>
+<label class="auth-consent"><input id="requestConsent" type="checkbox" required> Confirmo que minha participação é voluntária e que entendo que a RUMR é uma comunidade fictícia, sem autoridade legal estatal.</label>
+<button class="admin-btn auth-submit" type="submit">Enviar solicitação</button><p id="authMessage" class="auth-message" role="status" aria-live="polite"></p>
+</form></section></main>
+<footer><div class="footer-brand"><span class="seal small">R</span><b>REPÚBLICA UNIDA DE MONTE REAL</b></div><p>Portal institucional de uma comunidade fictícia e voluntária.</p></footer>
+<script src="https://cdn.jsdelivr.net/npm/appwrite@17.0.0"></script><script src="auth.js"></script>
+</body></html>
