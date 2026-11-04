@@ -46,10 +46,10 @@ export default async ({ req, res, log, error }) => {
     }
 
     // A chave efêmera é fornecida pelo Appwrite somente no ambiente da Function.
-    const functionKey = process.env.APPWRITE_FUNCTION_API_KEY;
+    const functionKey = req.headers["x-appwrite-key"];
     if (!functionKey) {
-      error("Missing APPWRITE_FUNCTION_API_KEY.");
-      return json(res, 500, { ok: false, message: "A função ainda não recebeu a chave interna do Appwrite." });
+      error("Missing x-appwrite-key request header.");
+      return json(res, 500, { ok: false, message: "O Appwrite não forneceu a chave temporária para esta execução." });
     }
 
     const serviceClient = new Client()
