@@ -17,8 +17,8 @@
     showMessage("O serviço de autenticação não carregou. Atualize a página e tente novamente.", "error");
     return;
   }
-  if (!Appwrite.Client || !Appwrite.Account || !Appwrite.TablesDB) {
-    showMessage("A versão do serviço de autenticação é incompatível. Avise a administração.", "error");
+  if (!Appwrite.Client || !Appwrite.Account) {
+    showMessage("O SDK de autenticação está incompleto. Atualize a página e tente novamente.", "error");
     return;
   }
 
@@ -31,7 +31,6 @@
     .setEndpoint(ENDPOINT)
     .setProject(PROJECT_ID);
   const account = new Appwrite.Account(client);
-  const tablesDB = new Appwrite.TablesDB(client);
   const DATABASE_ID = "rumr_main";
   const REQUESTS_TABLE_ID = "membership_requests";
   const friendlyError = (error) => {
@@ -148,6 +147,11 @@
       submit.disabled = true;
       showMessage("Enviando sua solicitação…");
       try {
+        if (!Appwrite.TablesDB) {
+          showMessage("O módulo de banco de dados não carregou. Atualize a página e tente novamente.", "error");
+          return;
+        }
+        const tablesDB = new Appwrite.TablesDB(client);
         const user = await account.get();
         if (!user.emailVerification) {
           showMessage("Verifique seu e-mail antes de enviar a solicitação.", "error");
@@ -199,4 +203,7 @@
       window.location.replace("login.html");
     });
   }
+
+  // Sinaliza que os módulos e os eventos foram inicializados.
+  window.RUMR_AUTH_READY = true;
 })();
