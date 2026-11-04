@@ -11,6 +11,8 @@ O site é publicado pelo GitHub Pages (quando habilitado nas configurações do 
 - `documentos/`: Constituição, modelos de decretos e regimentos.
 - `ministerios/`: estrutura ministerial.
 - `instituicoes/`: estatutos da Presidência, Congresso unicameral e Supremo Tribunal.
+- `documento.html` e `documento.js`: visualizador formatado de documentos Markdown.
+- `SUPABASE_SETUP.md` e `supabase/migrations/`: guia e base SQL para autenticação, aprovação manual e decretos.
 
 ## Painel administrativo — atenção
 O painel atual é apenas um protótipo estático. Ele salva rascunhos no armazenamento local do navegador e permite baixar arquivos Markdown. Não publica documentos no GitHub automaticamente e não possui autenticação segura. Não trate o endereço do painel como privado.
