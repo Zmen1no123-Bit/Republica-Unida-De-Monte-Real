@@ -31,12 +31,16 @@ export default async ({ req, res, log, error }) => {
     const account = new Account(userClient);
     const teams = new Teams(userClient);
 
+    log("DIAG 1: antes de account.get");
     const user = await account.get();
+    log("DIAG 2: account.get concluído");
     if (!user.emailVerification) {
       return json(res, 403, { ok: false, message: "Verifique seu e-mail antes de acessar a administração." });
     }
 
+    log("DIAG 3: antes de teams.listMemberships");
     const teamResult = await teams.listMemberships({ teamId: TEAM_ID, total: false });
+    log("DIAG 4: teams.listMemberships concluído");
     const isConfirmedAdmin = teamResult.memberships.some(
       (membership) => membership.userId === user.$id && membership.confirm === true
     );
@@ -46,6 +50,7 @@ export default async ({ req, res, log, error }) => {
     }
 
     // A chave efêmera é fornecida pelo Appwrite somente no ambiente da Function.
+    log("DIAG 5: verificando chave efêmera");
     const functionKey = req.headers["x-appwrite-key"];
     if (!functionKey) {
       error("Missing x-appwrite-key request header.");
@@ -66,12 +71,14 @@ export default async ({ req, res, log, error }) => {
     }
 
     if (action === "list") {
+      log("DIAG 6: antes de tablesDB.listRows");
       const result = await tablesDB.listRows({
         databaseId: DATABASE_ID,
         tableId: TABLE_ID,
         queries: [Query.orderDesc("$createdAt"), Query.limit(100)]
       });
 
+      log("DIAG 7: tablesDB.listRows concluído");
       return json(res, 200, {
         ok: true,
         requests: result.rows.map((row) => ({
@@ -114,7 +121,8 @@ export default async ({ req, res, log, error }) => {
 
     return json(res, 400, { ok: false, message: "Ação desconhecida." });
   } catch (err) {
-    error("RUMR admin function error: " + (err?.message || String(err)));
+    error("RUMR admin function error: " + (err?.stack || err?.message || String(err)));
+    if (err?.cause) error("RUMR admin function cause: " + (err.cause?.stack || err.cause?.message || String(err.cause)));
     const code = Number(err?.code) || 500;
     if (code === 404) {
       return json(res, 404, { ok: false, message: "Tabela ou solicitação não encontrada. Confira a configuração do banco." });
