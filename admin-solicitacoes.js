@@ -35,13 +35,14 @@
   }
 
   async function callAdmin(payload) {
-    const execution = await functions.createExecution({
-      functionId: FUNCTION_ID,
-      body: JSON.stringify(payload),
-      async: false,
-      method: "POST",
-      headers: { "content-type": "application/json" }
-    });
+    const execution = await functions.createExecution(
+      FUNCTION_ID,
+      JSON.stringify(payload),
+      false,
+      "/",
+      "POST",
+      { "content-type": "application/json" }
+    );
 
     let result = {};
     try {
