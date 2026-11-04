@@ -24,17 +24,20 @@
 </main>
 <footer><div class="footer-brand"><span class="seal small">R</span><b>REPÚBLICA UNIDA DE MONTE REAL</b></div><p>Portal institucional de uma comunidade fictícia e voluntária.</p></footer>
 <script src="https://cdn.jsdelivr.net/npm/appwrite@17.0.0"></script>
-<script src="auth.js?v=2"></script>
+<script src="auth.js?v=3"></script>
 <script>
-  // Diagnóstico temporário: impede o recarregamento nativo e confirma
-  // se o navegador está detectando o envio do formulário.
+  // Evita o envio nativo se a autenticação não inicializou.
+  // Quando auth.js está pronto, seu próprio listener processa o login.
   (() => {
     const form = document.getElementById("loginForm");
     const message = document.getElementById("authMessage");
     if (!form || !message) return;
-    form.addEventListener("submit", () => {
-      message.textContent = "Envio detectado. Verificando o funcionamento do login…";
-      message.dataset.type = "info";
+    form.addEventListener("submit", (event) => {
+      if (window.RUMR_AUTH_READY !== true) {
+        event.preventDefault();
+        message.textContent = "O sistema de login não inicializou. Recarregue a página; se persistir, avise a administração.";
+        message.dataset.type = "error";
+      }
     }, true);
   })();
 </script>
