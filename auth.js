@@ -17,8 +17,9 @@
     showMessage("O serviço de autenticação não carregou. Atualize a página e tente novamente.", "error");
     return;
   }
-  if (!Appwrite.Client || !Appwrite.Account) {
-    showMessage("O SDK de autenticação está incompleto. Atualize a página e tente novamente.", "error");
+  const missingSdkParts = ["Client", "Account"].filter((name) => typeof window.Appwrite[name] !== "function");
+  if (missingSdkParts.length) {
+    showMessage("O SDK foi carregado, mas faltam componentes: " + missingSdkParts.join(", ") + ". Vou precisar identificar a versão entregue pelo CDN.", "error");
     return;
   }
 
