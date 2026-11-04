@@ -1,0 +1,12 @@
+{
+  "name": "rumr-admin-function",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/main.js"
+  },
+  "dependencies": {
+    "node-appwrite": "^20.0.0"
+  }
+}
