@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Análise de solicitações • RUMR</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .requests-wrap{max-width:1000px;margin:48px auto;padding:0 20px}
+    .requests-head{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:24px}
+    .requests-panel{background:#fff;border:1px solid #e5e1d7;border-radius:14px;padding:22px;margin:16px 0}
+    .request-card{border:1px solid #e5e1d7;border-radius:10px;padding:18px;margin:14px 0}
+    .request-meta{color:#777;font-size:13px;margin:8px 0}
+    .request-motivation{white-space:pre-wrap;line-height:1.6;margin:14px 0}
+    .request-actions{display:flex;gap:10px;flex-wrap:wrap}
+    .request-actions button,.requests-button{border:0;border-radius:7px;padding:10px 15px;cursor:pointer;font-weight:600}
+    .approve{background:#e6f2e8;color:#205b2c}.reject{background:#f8e8e6;color:#8b2820}
+    .requests-button{background:#b58a2b;color:#fff}.requests-button:disabled,.request-actions button:disabled{opacity:.55;cursor:wait}
+    .request-status{display:inline-block;padding:4px 9px;border-radius:20px;background:#f0eee8;font-size:12px}
+    .request-status.approved{background:#e6f2e8;color:#205b2c}.request-status.rejected{background:#f8e8e6;color:#8b2820}
+    #requestsMessage{padding:12px 14px;border-radius:8px;background:#f4f1e9;margin:14px 0}
+    #requestsMessage[hidden]{display:none}
+    .empty-state{color:#777;padding:18px 0}
+  </style>
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="index.html"><span class="seal">R</span><span><b>REPÚBLICA UNIDA</b><small>ANÁLISE DE SOLICITAÇÕES</small></span></a>
+    <a class="back" href="painel.html">← Área do membro</a>
+  </header>
+  <main class="requests-wrap">
+    <div class="requests-head">
+      <div><p class="eyebrow">GESTÃO INSTITUCIONAL</p><h1>Análise de <em style="color:#b58a2b">solicitações</em></h1><p class="muted">Área restrita à equipe de administração da comunidade fictícia RUMR.</p></div>
+      <button class="requests-button" id="refreshRequests" type="button">Atualizar lista</button>
+    </div>
+    <section class="requests-panel">
+      <div id="requestsMessage" role="status" aria-live="polite">Verificando sua sessão…</div>
+      <div id="requestsList"><p class="empty-state">Carregando…</p></div>
+    </section>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/appwrite@17.0.0"></script>
+  <script src="admin-solicitacoes.js"></script>
+</body>
+</html>
