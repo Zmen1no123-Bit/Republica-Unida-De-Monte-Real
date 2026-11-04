@@ -28,7 +28,19 @@ Os integrantes da República Unida de Monte Real, reunidos com o propósito de o
 
 **Art. 8º** Os documentos deverão indicar expressamente quando forem minutas, propostas ou atos aprovados.
 
-## Título IV — Das disposições finais
+## Título IV — Do sistema de governo
+
+**Art. 9º** A organização comunitária adota o sistema presidencialista. O Presidente exerce a coordenação do Poder Executivo comunitário, respeitadas as competências dos demais órgãos e as regras internas aprovadas.
+
+**Art. 10º** O Poder Legislativo comunitário será exercido por um Congresso unicameral, composto por uma única câmara de representantes.
+
+**Art. 11º** O Supremo Tribunal será o órgão comunitário independente responsável pela interpretação das normas internas e pela revisão de controvérsias institucionais, sem exercer jurisdição estatal.
+
+**Art. 12º** Os juízes do Supremo Tribunal serão indicados pela Presidência e dependerão de aprovação do Congresso para assumir suas funções. O procedimento, os critérios, a duração dos mandatos e as hipóteses de substituição deverão ser definidos em regulamento próprio.
+
+**Art. 13º** A Presidência, o Congresso e o Supremo Tribunal deverão respeitar a transparência, o direito de manifestação dos envolvidos, a imparcialidade e os limites desta organização voluntária.
+
+## Título V — Das disposições finais
 
 **Art. 9º** Esta minuta somente será considerada norma interna após discussão e aprovação conforme procedimento definido pela comunidade.
 
