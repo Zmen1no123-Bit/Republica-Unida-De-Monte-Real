@@ -2,7 +2,7 @@ import { Client, Account, Teams, TablesDB, Query } from "node-appwrite";
 
 const PROJECT_ID = process.env.APPWRITE_FUNCTION_PROJECT_ID;
 const ENDPOINT = process.env.APPWRITE_FUNCTION_API_ENDPOINT;
-const TEAM_ID = "rumr-admins";
+const TEAM_ID = "rumr-admin";
 const DATABASE_ID = "rumr_main";
 const TABLE_ID = "membership_requests";
 
