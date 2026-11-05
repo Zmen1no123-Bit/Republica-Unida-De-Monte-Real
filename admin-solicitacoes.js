@@ -15,6 +15,22 @@
   const list = document.getElementById("requestsList");
   const refreshButton = document.getElementById("refreshRequests");
 
+  // Bloco de estatísticas, inserido logo acima da mensagem de status.
+  const statsBox = document.createElement("div");
+  statsBox.id = "statsPanel";
+  statsBox.setAttribute("aria-live", "polite");
+  message.parentNode.insertBefore(statsBox, message);
+
+  const statsStyle = document.createElement("style");
+  statsStyle.textContent = `
+    #statsPanel{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:18px}
+    #statsPanel .stat{background:#fff;border:1px solid #e4dfd2;border-radius:12px;padding:14px 16px}
+    #statsPanel .stat span{display:block;font-size:12px;letter-spacing:.06em;color:#6b6b66;text-transform:uppercase}
+    #statsPanel .stat strong{display:block;font-size:26px;margin-top:4px;color:#111}
+    #statsPanel .stat.pending strong{color:#8a6d1f}
+  `;
+  document.head.appendChild(statsStyle);
+
   function showMessage(text, isError = false) {
     message.hidden = false;
     message.textContent = text;
@@ -57,6 +73,38 @@
     return result;
   }
 
+  function renderStats(stats) {
+    const items = [
+      ["Total de membros", stats.members, ""],
+      ["Membros ativos", stats.membersActive, ""],
+      ["Membros suspensos", stats.membersSuspended, ""],
+      ["Solicitações pendentes", stats.pending, "pending"],
+      ["Aprovadas", stats.approved, ""],
+      ["Rejeitadas", stats.rejected, ""]
+    ];
+
+    statsBox.replaceChildren(...items.map(([label, value, extraClass]) => {
+      const card = document.createElement("div");
+      card.className = ("stat " + extraClass).trim();
+      const span = document.createElement("span");
+      span.textContent = label;
+      const strong = document.createElement("strong");
+      strong.textContent = String(value ?? 0);
+      card.append(span, strong);
+      return card;
+    }));
+  }
+
+  async function loadStats() {
+    try {
+      const result = await callAdmin({ action: "stats" });
+      renderStats(result.stats);
+    } catch (error) {
+      console.error("RUMR stats:", error);
+      statsBox.replaceChildren();
+    }
+  }
+
   function renderRequests(requests) {
     if (!Array.isArray(requests) || requests.length === 0) {
       list.innerHTML = '<p class="empty-state">Nenhuma solicitação encontrada.</p>';
@@ -93,6 +141,7 @@
       const result = await callAdmin({ action: "list" });
       renderRequests(result.requests);
       showMessage("Solicitações carregadas. A autorização foi validada pelo servidor.");
+      loadStats();
     } catch (error) {
       console.error("RUMR admin panel:", error);
       list.innerHTML = "";
