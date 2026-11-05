@@ -35,6 +35,7 @@
     .setEndpoint(ENDPOINT)
     .setProject(PROJECT_ID);
   const account = new Appwrite.Account(client);
+   const functions = new Appwrite.Functions(client);
   const databases = new Appwrite.Databases(client);
 
   const friendlyError = (error) => {
