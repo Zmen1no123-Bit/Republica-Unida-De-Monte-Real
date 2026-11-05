@@ -285,6 +285,14 @@ export default async ({ req, res, error }) => {
     const isAdmin = adminUserIds.has(user.$id);
     const isParlamentar = await isActiveParlamentar(tablesDB, user.$id);
     const action = body.action;
+    
+        if (action === "whoami") {
+      return json(res, 200, {
+        ok: true,
+        isAdmin,
+        isParlamentar
+      });
+    }
 
     // Ações do Congresso: parlamentares propõem e votam; administradores também consultam a lista.
     if (action === "proposals") {
