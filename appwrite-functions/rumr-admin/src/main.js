@@ -327,3 +327,4 @@ export default async ({ req, res, error }) => {
     }
     return json(res, 500, { ok: false, message: "Não foi possível concluir a operação. Consulte os logs da função." });
   }
+};
