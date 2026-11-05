@@ -83,12 +83,12 @@ export default async ({ req, res, log, error }) => {
         ok: true,
         requests: result.rows.map((row) => ({
           id: row.$id,
-          displayName: row.displayName,
-          motivation: row.motivation,
-          status: row.status || "pending",
+          displayName: row.DisplayName || "",
+          motivation: row.Motivation || "",
+          status: (row.Status || "pending").toLowerCase(),
           createdAt: row.$createdAt,
-          reviewedAt: row.reviewedAt || null,
-          reviewedBy: row.reviewedBy || null
+          reviewedAt: row.ReviewedAt || null,
+          reviewedBy: row.ReviewedBy || null
         }))
       });
     }
@@ -106,16 +106,16 @@ export default async ({ req, res, log, error }) => {
         tableId: TABLE_ID,
         rowId,
         data: {
-          status,
-          reviewedAt: new Date().toISOString(),
-          reviewedBy: user.$id
+          Status: status,
+          ReviewedAt: new Date().toISOString(),
+          ReviewedBy: user.$id
         }
       });
 
       return json(res, 200, {
         ok: true,
         message: status === "approved" ? "Solicitação aprovada." : "Solicitação rejeitada.",
-        request: { id: updated.$id, status: updated.status }
+        request: { id: updated.$id, status: (updated.Status || status).toLowerCase() }
       });
     }
 
