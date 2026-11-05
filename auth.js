@@ -1,4 +1,4 @@
-/* Autenticação RUMR — Appwrite Web SDK.
+/* Autenticação RUMR — Appwrite Web SDK 17.0.0.
    O Project ID e o endpoint são identificadores públicos. Nunca colocar API keys
    ou tokens administrativos neste arquivo ou em qualquer arquivo do GitHub Pages. */
 (() => {
@@ -12,14 +12,15 @@
     el.dataset.type = type;
   };
 
-  // Mostra um diagnóstico visível caso o SDK não tenha carregado.
   if (!window.Appwrite) {
     showMessage("O serviço de autenticação não carregou. Atualize a página e tente novamente.", "error");
     return;
   }
-  const missingSdkParts = ["Client", "Account"].filter((name) => typeof window.Appwrite[name] !== "function");
+
+  const requiredParts = ["Client", "Account", "Databases", "ID", "Permission", "Role"];
+  const missingSdkParts = requiredParts.filter((name) => !window.Appwrite[name]);
   if (missingSdkParts.length) {
-    showMessage("O SDK foi carregado, mas faltam componentes: " + missingSdkParts.join(", ") + ". Vou precisar identificar a versão entregue pelo CDN.", "error");
+    showMessage("O SDK foi carregado, mas faltam componentes: " + missingSdkParts.join(", ") + ". Atualize a página e tente novamente.", "error");
     return;
   }
 
@@ -27,13 +28,15 @@
   const ENDPOINT = "https://fra.cloud.appwrite.io/v1";
   const APP_URL = "https://zmen1no123-bit.github.io/Republica-Unida-De-Monte-Real/";
   const VERIFY_URL = APP_URL + "verificar.html";
+  const DATABASE_ID = "6aeb8a27000848e802b4";
+  const REQUESTS_TABLE_ID = "membership_requests";
 
   const client = new Appwrite.Client()
     .setEndpoint(ENDPOINT)
     .setProject(PROJECT_ID);
   const account = new Appwrite.Account(client);
-  const DATABASE_ID = "rumr_main";
-  const REQUESTS_TABLE_ID = "membership_requests";
+  const databases = new Appwrite.Databases(client);
+
   const friendlyError = (error) => {
     const code = error && error.code;
     if (code === 409) return "Este e-mail já possui uma conta. Tente entrar.";
@@ -148,23 +151,18 @@
       submit.disabled = true;
       showMessage("Enviando sua solicitação…");
       try {
-        if (!Appwrite.TablesDB) {
-          showMessage("O módulo de banco de dados não carregou. Atualize a página e tente novamente.", "error");
-          return;
-        }
-        const tablesDB = new Appwrite.TablesDB(client);
         const user = await account.get();
         if (!user.emailVerification) {
           showMessage("Verifique seu e-mail antes de enviar a solicitação.", "error");
           return;
         }
-        await tablesDB.createRow({
-          databaseId: DATABASE_ID,
-          tableId: REQUESTS_TABLE_ID,
-          rowId: Appwrite.ID.unique(),
-          data: { displayName, motivation },
-          permissions: [Appwrite.Permission.read(Appwrite.Role.user(user.$id))]
-        });
+        await databases.createDocument(
+          DATABASE_ID,
+          REQUESTS_TABLE_ID,
+          Appwrite.ID.unique(),
+          { DisplayName: displayName, Motivation: motivation },
+          [Appwrite.Permission.read(Appwrite.Role.user(user.$id))]
+        );
         showMessage("Solicitação enviada! Ela ficará disponível para análise. Criar uma conta não significa aprovação automática.", "success");
         requestForm.reset();
         submit.textContent = "Solicitação enviada";
@@ -205,6 +203,5 @@
     });
   }
 
-  // Sinaliza que os módulos e os eventos foram inicializados.
   window.RUMR_AUTH_READY = true;
 })();
