@@ -42,9 +42,9 @@ Os integrantes da República Unida de Monte Real, reunidos com o propósito de o
 
 ## Título V — Das disposições finais
 
-**Art. 9º** Esta minuta somente será considerada norma interna após discussão e aprovação conforme procedimento definido pela comunidade.
+**Art. 14º** Esta minuta somente será considerada norma interna após discussão e aprovação conforme procedimento definido pela comunidade.
 
-**Art. 10º** Esta Constituição comunitária não possui força de lei estatal.
+**Art. 15º** Esta Constituição comunitária não possui força de lei estatal.
 
 ---
 
