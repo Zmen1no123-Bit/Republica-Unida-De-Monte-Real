@@ -136,8 +136,7 @@
         });
     }
   }
-
-  const requestForm = byId("membershipForm");
+     const requestForm = byId("membershipForm");
   if (requestForm) {
     requestForm.addEventListener("submit", async (event) => {
       event.preventDefault();
@@ -148,32 +147,32 @@
         showMessage("Use um nome de 2 a 60 caracteres e uma mensagem de 10 a 500 caracteres.", "error");
         return;
       }
-               const profileCheck = await databases.listDocuments(
-          DATABASE_ID,
-          "member_profiles",
-          [Appwrite.Query.equal("UserId", user.$id), Appwrite.Query.limit(1)]
-        );
-        if (profileCheck.documents.length && profileCheck.documents[0].AccountStatus === "suspended") {
-          showMessage("Sua conta está suspensa. Não é possível enviar novas solicitações.", "error");
+      submit.disabled = true;
+      showMessage("Enviando sua solicitação…");
+      try {
+        const user = await account.get();
+        if (!user.emailVerification) {
+          showMessage("Verifique seu e-mail antes de enviar a solicitação.", "error");
           return;
         }
-        await databases.createDocument(
-          DATABASE_ID,
-          REQUESTS_TABLE_ID,
-          Appwrite.ID.unique(),
-          { DisplayName: displayName, Motivation: motivation },
-          [Appwrite.Permission.read(Appwrite.Role.user(user.$id))]
+        const execution = await functions.createExecution(
+          "rumr-admin",
+          JSON.stringify({ action: "request", displayName, motivation }),
+          false,
+          "/",
+          "POST",
+          { "content-type": "application/json" }
         );
-        showMessage("Solicitação enviada! Ela ficará disponível para análise. Criar uma conta não significa aprovação automática.", "success");
+        const result = JSON.parse(execution.responseBody || "{}");
+        if (execution.responseStatusCode < 200 || execution.responseStatusCode >= 300 || !result.ok) {
+          throw new Error(result.message || "Não foi possível enviar a solicitação.");
+        }
+        showMessage(result.message, "success");
         requestForm.reset();
         submit.textContent = "Solicitação enviada";
       } catch (error) {
         console.error("RUMR membership request error:", error);
-        if (error && (error.code === 404 || error.code === 401 || error.code === 403)) {
-          showMessage("Não foi possível enviar. Confira se a tabela, as colunas e as permissões estão configuradas corretamente.", "error");
-        } else {
-          showMessage("Falha ao enviar a solicitação. Confira sua conexão e tente novamente.", "error");
-        }
+        showMessage(error.message || "Falha ao enviar a solicitação. Confira sua conexão e tente novamente.", "error");
       } finally {
         submit.disabled = submit.textContent === "Solicitação enviada";
       }
