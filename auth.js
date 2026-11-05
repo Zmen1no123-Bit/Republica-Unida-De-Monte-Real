@@ -148,12 +148,13 @@
         showMessage("Use um nome de 2 a 60 caracteres e uma mensagem de 10 a 500 caracteres.", "error");
         return;
       }
-      submit.disabled = true;
-      showMessage("Enviando sua solicitação…");
-      try {
-        const user = await account.get();
-        if (!user.emailVerification) {
-          showMessage("Verifique seu e-mail antes de enviar a solicitação.", "error");
+               const profileCheck = await databases.listDocuments(
+          DATABASE_ID,
+          "member_profiles",
+          [Appwrite.Query.equal("UserId", user.$id), Appwrite.Query.limit(1)]
+        );
+        if (profileCheck.documents.length && profileCheck.documents[0].AccountStatus === "suspended") {
+          showMessage("Sua conta está suspensa. Não é possível enviar novas solicitações.", "error");
           return;
         }
         await databases.createDocument(
