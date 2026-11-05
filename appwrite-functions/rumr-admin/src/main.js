@@ -1,13 +1,55 @@
-import { Client, Account, Teams, TablesDB, Query } from "node-appwrite";
+import { Client, Account, Teams, TablesDB, Query, ID, Permission, Role } from "node-appwrite";
 
 const PROJECT_ID = process.env.APPWRITE_FUNCTION_PROJECT_ID;
 const ENDPOINT = process.env.APPWRITE_FUNCTION_API_ENDPOINT;
 const TEAM_ID = "rumr-admin";
 const DATABASE_ID = "6aeb8a27000848e802b4";
-const TABLE_ID = "membership_requests";
+const REQUESTS_TABLE_ID = "membership_requests";
+const PROFILES_TABLE_ID = "member_profiles";
 
 function json(res, statusCode, body) {
   return res.json(body, statusCode);
+}
+
+// Identifica quem enviou a solicitação pela permissão de leitura gravada no formulário.
+function applicantIdFrom(row) {
+  for (const permission of row.$permissions || []) {
+    const match = /^read\("user:([^"]+)"\)$/.exec(permission);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+// Cria o perfil do membro. Se já existir (índice único em UserId), não repete a criação.
+async function createMemberProfile(tablesDB, userId, displayName) {
+  const last = await tablesDB.listRows({
+    databaseId: DATABASE_ID,
+    tableId: PROFILES_TABLE_ID,
+    queries: [Query.orderDesc("MemberNumber"), Query.limit(1)]
+  });
+  const nextNumber = last.rows.length ? Number(last.rows[0].MemberNumber) + 1 : 1;
+  const now = new Date().toISOString();
+
+  try {
+    await tablesDB.createRow({
+      databaseId: DATABASE_ID,
+      tableId: PROFILES_TABLE_ID,
+      rowId: ID.unique(),
+      data: {
+        UserId: userId,
+        DisplayName: displayName || "Membro",
+        MemberNumber: nextNumber,
+        JoinedAt: now,
+        AccountStatus: "active",
+        UpdatedAt: now
+      },
+      permissions: [Permission.read(Role.user(userId))]
+    });
+  } catch (err) {
+    if (err?.code === 409) return "already-exists";
+    throw err;
+  }
+  return "created";
 }
 
 export default async ({ req, res, error }) => {
@@ -67,7 +109,7 @@ export default async ({ req, res, error }) => {
     if (action === "list") {
       const result = await tablesDB.listRows({
         databaseId: DATABASE_ID,
-        tableId: TABLE_ID,
+        tableId: REQUESTS_TABLE_ID,
         queries: [Query.orderDesc("$createdAt"), Query.limit(100)]
       });
 
@@ -93,9 +135,24 @@ export default async ({ req, res, error }) => {
         return json(res, 400, { ok: false, message: "Dados de revisão inválidos." });
       }
 
+      const row = await tablesDB.getRow({
+        databaseId: DATABASE_ID,
+        tableId: REQUESTS_TABLE_ID,
+        rowId
+      });
+
+      if (status === "approved") {
+        const applicantId = applicantIdFrom(row);
+        if (!applicantId) {
+          error("Não foi possível identificar o solicitante da linha " + rowId);
+          return json(res, 422, { ok: false, message: "Não foi possível identificar o solicitante desta solicitação." });
+        }
+        await createMemberProfile(tablesDB, applicantId, row.DisplayName);
+      }
+
       const updated = await tablesDB.updateRow({
         databaseId: DATABASE_ID,
-        tableId: TABLE_ID,
+        tableId: REQUESTS_TABLE_ID,
         rowId,
         data: {
           Status: status,
@@ -106,7 +163,7 @@ export default async ({ req, res, error }) => {
 
       return json(res, 200, {
         ok: true,
-        message: status === "approved" ? "Solicitação aprovada." : "Solicitação rejeitada.",
+        message: status === "approved" ? "Solicitação aprovada e perfil criado." : "Solicitação rejeitada.",
         request: { id: updated.$id, status }
       });
     }
