@@ -4,15 +4,16 @@ const PROJECT_ID = process.env.APPWRITE_FUNCTION_PROJECT_ID;
 const ENDPOINT = process.env.APPWRITE_FUNCTION_API_ENDPOINT;
 const TEAM_ID = "rumr-admin";
 const DATABASE_ID = "6aeb8a27000848e802b4";
-const DOCUMENTS_TABLE_ID = "documents";
 const REQUESTS_TABLE_ID = "membership_requests";
 const PROFILES_TABLE_ID = "member_profiles";
 const ADMIN_ACTIONS_TABLE_ID = "admin_actions";
 const APPOINTMENTS_TABLE_ID = "appointments";
+const DOCUMENTS_TABLE_ID = "documents";
 
 const PENDING_VALUES = ["pending", "Pending"];
 const APPROVED_VALUES = ["approved", "Approved"];
 const REJECTED_VALUES = ["rejected", "Rejected"];
+const DOCUMENT_CATEGORIES = ["decreto", "ministerio", "instituicao", "constituicao", "regimento"];
 
 // Cargos permitidos. Qualquer outro valor é recusado pelo servidor.
 const POSITIONS = {
@@ -25,6 +26,17 @@ const POSITIONS = {
 
 function json(res, statusCode, body) {
   return res.json(body, statusCode);
+}
+
+// Cliente com a chave de serviço. Retorna null se a chave não estiver configurada.
+function serviceDB() {
+  const key = process.env.APPWRITE_API_KEY;
+  if (!key) return null;
+  const client = new Client()
+    .setEndpoint(ENDPOINT)
+    .setProject(PROJECT_ID)
+    .setKey(key);
+  return new TablesDB(client);
 }
 
 function applicantIdFrom(row) {
@@ -50,25 +62,27 @@ async function createMemberProfile(tablesDB, userId, displayName) {
   const nextNumber = last.rows.length ? Number(last.rows[0].MemberNumber) + 1 : 1;
   const now = new Date().toISOString();
 
-      const result = await publicDB.listRows({
-        databaseId: DATABASE_ID,
-        tableId: DOCUMENTS_TABLE_ID,
-        queries: [Query.equal("Published", [true]), Query.orderAsc("Slug"), Query.limit(100)]
-      });
-
-      return json(res, 200, {
-        ok: true,
-        documents: result.rows.map((row) => ({
-          slug: row.Slug,
-          title: row.Title,
-          category: row.Category,
-          institution: row.Institution || "",
-          number: row.Number ?? null,
-          content: row.Content,
-          publishedAt: row.PublishedAt || null,
-          updatedAt: row.UpdatedAt || null
-        }))
-      });
+  try {
+    await tablesDB.createRow({
+      databaseId: DATABASE_ID,
+      tableId: PROFILES_TABLE_ID,
+      rowId: ID.unique(),
+      data: {
+        UserId: userId,
+        DisplayName: displayName || "Membro",
+        MemberNumber: nextNumber,
+        JoinedAt: now,
+        AccountStatus: "active",
+        UpdatedAt: now
+      },
+      permissions: [Permission.read(Role.user(userId))]
+    });
+  } catch (err) {
+    if (err?.code === 409) return "already-exists";
+    throw err;
+  }
+  return "created";
+}
 
 async function logAdminAction(tablesDB, { actorId, action, targetUserId, targetRowId, reason }) {
   await tablesDB.createRow({
@@ -94,7 +108,6 @@ async function countRows(tablesDB, tableId, queries = []) {
   return result.total;
 }
 
-// Cargo ativo do membro, ou null.
 async function findActiveAppointment(tablesDB, userId) {
   const result = await tablesDB.listRows({
     databaseId: DATABASE_ID,
@@ -104,7 +117,6 @@ async function findActiveAppointment(tablesDB, userId) {
   return result.rows[0] || null;
 }
 
-// Encerra todos os cargos ativos do membro. Usado quando a conta é suspensa.
 async function endActiveAppointments(tablesDB, userId, reason) {
   const result = await tablesDB.listRows({
     databaseId: DATABASE_ID,
@@ -129,20 +141,15 @@ export default async ({ req, res, error }) => {
       return json(res, 405, { ok: false, message: "Método não permitido." });
     }
 
-        // Rota pública: documentos publicados, sem login. Só devolve campos seguros.
-    const publicBody = req.bodyJson || {};
-    if (publicBody.action === "public-documents") {
-      const publicKey = process.env.APPWRITE_API_KEY;
-      if (!publicKey) {
+    const body = req.bodyJson || {};
+
+    // Rota pública: documentos publicados, sem login. Só devolve campos seguros.
+    if (body.action === "public-documents") {
+      const publicDB = serviceDB();
+      if (!publicDB) {
         error("Variável APPWRITE_API_KEY ausente.");
         return json(res, 500, { ok: false, message: "Configuração interna incompleta." });
       }
-
-      const publicClient = new Client()
-        .setEndpoint(ENDPOINT)
-        .setProject(PROJECT_ID)
-        .setKey(publicKey);
-      const publicDB = new TablesDB(publicClient);
 
       const result = await publicDB.listRows({
         databaseId: DATABASE_ID,
@@ -189,26 +196,20 @@ export default async ({ req, res, error }) => {
       return json(res, 403, { ok: false, message: "Verifique seu e-mail antes de acessar a administração." });
     }
 
-        const payload = req.bodyJson || {};
-    if (payload.action === "request") {
-      const displayName = typeof payload.displayName === "string" ? payload.displayName.trim() : "";
-      const motivation = typeof payload.motivation === "string" ? payload.motivation.trim() : "";
+    // Envio de solicitação de ingresso: qualquer usuário verificado, sem ser administrador.
+    if (body.action === "request") {
+      const displayName = typeof body.displayName === "string" ? body.displayName.trim() : "";
+      const motivation = typeof body.motivation === "string" ? body.motivation.trim() : "";
 
       if (displayName.length < 2 || displayName.length > 60 || motivation.length < 10 || motivation.length > 500) {
         return json(res, 400, { ok: false, message: "Use um nome de 2 a 60 caracteres e uma mensagem de 10 a 500 caracteres." });
       }
 
-      const requestKey = process.env.APPWRITE_API_KEY;
-      if (!requestKey) {
+      const requestDB = serviceDB();
+      if (!requestDB) {
         error("Variável APPWRITE_API_KEY ausente.");
         return json(res, 500, { ok: false, message: "Configuração interna incompleta." });
       }
-
-      const requestClient = new Client()
-        .setEndpoint(ENDPOINT)
-        .setProject(PROJECT_ID)
-        .setKey(requestKey);
-      const requestDB = new TablesDB(requestClient);
 
       const profiles = await requestDB.listRows({
         databaseId: DATABASE_ID,
@@ -243,19 +244,12 @@ export default async ({ req, res, error }) => {
       teamResult.memberships.filter((m) => m.confirm === true).map((m) => m.userId)
     );
 
-    const functionKey = process.env.APPWRITE_API_KEY;
-    if (!functionKey) {
+    const tablesDB = serviceDB();
+    if (!tablesDB) {
       error("Variável APPWRITE_API_KEY ausente.");
       return json(res, 500, { ok: false, message: "A chave de serviço da função não está configurada." });
     }
 
-    const serviceClient = new Client()
-      .setEndpoint(ENDPOINT)
-      .setProject(PROJECT_ID)
-      .setKey(functionKey);
-
-    const tablesDB = new TablesDB(serviceClient);
-    const body = req.bodyJson || {};
     const action = body.action;
 
     if (action === "stats") {
@@ -479,28 +473,6 @@ export default async ({ req, res, error }) => {
 
       return json(res, 200, { ok: true, message: "Cargo encerrado." });
     }
-    
-        if (action === "documents") {
-      const result = await tablesDB.listRows({
-        databaseId: DATABASE_ID,
-        tableId: DOCUMENTS_TABLE_ID,
-        queries: [Query.equal("Published", [true]), Query.orderAsc("Slug"), Query.limit(100)]
-      });
-
-      return json(res, 200, {
-        ok: true,
-        documents: result.rows.map((row) => ({
-          slug: row.Slug,
-          title: row.Title,
-          category: row.Category,
-          institution: row.Institution || "",
-          number: row.Number ?? null,
-          content: row.Content,
-          publishedAt: row.PublishedAt || null,
-          updatedAt: row.UpdatedAt || null
-        }))
-      });
-    }
 
     if (action === "documents-admin") {
       const result = await tablesDB.listRows({
@@ -556,7 +528,7 @@ export default async ({ req, res, error }) => {
         if (!/^[a-z0-9-]{3,80}$/.test(slug)) {
           return json(res, 400, { ok: false, message: "Identificador inválido: use letras minúsculas, números e hífens (3 a 80 caracteres)." });
         }
-        if (!["decreto", "ministerio", "instituicao", "constituicao", "regimento"].includes(category)) {
+        if (!DOCUMENT_CATEGORIES.includes(category)) {
           return json(res, 400, { ok: false, message: "Categoria inválida." });
         }
         const created = await tablesDB.createRow({
