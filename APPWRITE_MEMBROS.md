@@ -1,47 +1,76 @@
-# Appwrite — configuração da solicitação de ingresso RUMR
+# Configuração do Appwrite — RUMR
 
-Faça esta configuração com acompanhamento de um responsável adulto. Não compartilhe senhas nem chaves administrativas.
+Este documento descreve a configuração atual do backend da RUMR. Não inclui chaves secretas.
 
-## 1. Criar o banco
+## Projeto
 
-No projeto Appwrite **RUMR**, abra **Databases** e crie um banco DocumentsDB:
-- Nome: `RUMR Principal`
-- Database ID: `rumr_main`
+- Nome: RUMR
+- Project ID: `6aeb2aec002a69ad90ef`
+- Endpoint: `https://fra.cloud.appwrite.io/v1`
+- Plataforma web autorizada: `zmen1no123-bit.github.io`
 
-## 2. Criar a coleção
+## Autenticação
 
-Dentro do banco, crie:
-- Nome: `Solicitações de ingresso`
-- Collection ID: `membership_requests`
+- Método: e-mail e senha.
+- Verificação de e-mail: ativa.
+- MFA: desabilitado.
 
-Crie os atributos:
-| Key | Tipo | Limite |
-|---|---|---:|
-| `displayName` | String | 60 |
-| `motivation` | String | 500 |
+## Banco de dados
 
-Não crie campos de cargo, aprovação ou função administrativa nesta coleção.
+- Banco: ID `6aeb8a27000848e802b4` (nome de exibição: `rumr_main`).
+- Tabela: `membership_requests` (nome: Solicitações de ingresso).
 
-## 3. Configurar a segurança
+Colunas, com os nomes exatos (diferenciam maiúsculas e minúsculas):
 
-Na aba **Security** da coleção:
-- Ative **Document-level security**.
-- Em permissões da coleção, conceda somente **Create** para **Users** com status **Verified**.
-- Não conceda Read, Update ou Delete no nível da coleção.
-- Não habilite acesso para **Any**.
+| Coluna | Tipo | Tamanho | Obrigatória | Padrão |
+|---|---|---|---|---|
+| `DisplayName` | String | 60 | Sim | — |
+| `Motivation` | String | 500 | Sim | — |
+| `Status` | String | 20 | Não | `Pending` |
+| `ReviewedAt` | Datetime | — | Não | — |
+| `ReviewedBy` | String | 36 | Não | — |
 
-O formulário define leitura do documento apenas para o usuário que o enviou. As permissões por documento dependem da segurança em nível de documento estar ativada. Documentação: https://appwrite.io/docs/products/databases/documentsdb/permissions
+Permissões da tabela:
 
-## 4. Revisão
+- Criação: "All users".
+- Leitura, atualização e exclusão para usuários comuns: não concedidas.
+- Row Security: habilitado. Cada solicitação é criada com permissão de leitura apenas para quem a enviou.
 
-As solicitações podem ser examinadas pelo responsável no Console Appwrite. Não crie botão de aprovação no navegador: aprovação e atribuição de cargos exigem uma operação confiável no servidor, que será uma etapa posterior.
+## Equipe de administradores
 
-## 5. Teste
+- Nome: Administradores RUMR
+- Team ID: `rumr-admin`
+- Membros com acesso ao painel: somente os que estiverem com status confirmado.
 
-1. Entre com uma conta cujo e-mail esteja verificado.
-2. Abra `painel.html` e escolha **Solicitar ingresso**.
-3. Envie um nome de exibição e uma breve mensagem.
-4. Confira se o documento aparece na coleção.
-5. Confirme que não existe permissão pública de leitura.
+## Function de administração
 
-Se aparecer erro de permissão, revise as configurações; não resolva concedendo acesso **Any**.
+- Nome: RUMR Administração
+- ID: `rumr-admin`
+- Runtime: Node.js 22
+- Root directory: `appwrite-functions/rumr-admin`
+- Entrypoint: `src/main.js`
+- Build command: `npm install`
+- Scopes: `rows.read` e `rows.write`
+- Execute access: Any (a própria Function valida o usuário e a equipe)
+
+A Function verifica, nesta ordem:
+
+1. Se a sessão (JWT) é válida.
+2. Se o e-mail do usuário foi verificado.
+3. Se o usuário é membro confirmado da equipe `rumr-admin`.
+
+Só depois disso executa as ações `list` e `review`. A autorização é feita no servidor, não no navegador.
+
+## Chave de API da Function
+
+- Nome da chave: `rumr-admin-function`
+- Escopos: somente `rows.read` e `rows.write`.
+- Armazenamento: variável da Function chamada `APPWRITE_API_KEY`, marcada como secret.
+
+A chave nunca deve ser colocada no frontend, em arquivos do repositório ou em mensagens. Se for exposta, revogue-a no Appwrite e crie outra.
+
+## Como verificar
+
+1. Listagem: o painel mostra as solicitações com nome e motivação.
+2. Rejeição e aprovação: o `Status` muda para `rejected` ou `approved`, e `ReviewedAt` e `ReviewedBy` são preenchidos.
+3. Acesso negado: uma conta fora da equipe recebe "Acesso restrito".
