@@ -9,11 +9,17 @@ const PROFILES_TABLE_ID = "member_profiles";
 const ADMIN_ACTIONS_TABLE_ID = "admin_actions";
 const APPOINTMENTS_TABLE_ID = "appointments";
 const DOCUMENTS_TABLE_ID = "documents";
+const PROPOSALS_TABLE_ID = "proposals";
+const VOTES_TABLE_ID = "votes";
 
 const PENDING_VALUES = ["pending", "Pending"];
 const APPROVED_VALUES = ["approved", "Approved"];
 const REJECTED_VALUES = ["rejected", "Rejected"];
 const DOCUMENT_CATEGORIES = ["decreto", "ministerio", "instituicao", "constituicao", "regimento"];
+const VOTE_CHOICES = ["favoravel", "contrario", "abstencao"];
+
+// Quórum mínimo de votos para encerrar uma proposta.
+const QUORUM = 5;
 
 // Cargos permitidos. Qualquer outro valor é recusado pelo servidor.
 const POSITIONS = {
@@ -50,6 +56,12 @@ function applicantIdFrom(row) {
 function validateReason(reason) {
   const text = typeof reason === "string" ? reason.trim() : "";
   if (text.length < 10 || text.length > 300) return null;
+  return text;
+}
+
+function validateText(value, min, max) {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (text.length < min || text.length > max) return null;
   return text;
 }
 
@@ -133,6 +145,35 @@ async function endActiveAppointments(tablesDB, userId, reason) {
     });
   }
   return result.rows.length;
+}
+
+// Verifica se o usuário ocupa o cargo de Parlamentar com nomeação ativa.
+async function isActiveParlamentar(tablesDB, userId) {
+  const result = await tablesDB.listRows({
+    databaseId: DATABASE_ID,
+    tableId: APPOINTMENTS_TABLE_ID,
+    queries: [
+      Query.equal("UserId", userId),
+      Query.equal("Position", ["Parlamentar"]),
+      Query.isNull("EndedAt"),
+      Query.limit(1)
+    ]
+  });
+  return result.rows.length > 0;
+}
+
+// Conta os votos de uma proposta, por escolha.
+async function tallyVotes(tablesDB, proposalId) {
+  const result = await tablesDB.listRows({
+    databaseId: DATABASE_ID,
+    tableId: VOTES_TABLE_ID,
+    queries: [Query.equal("ProposalId", proposalId), Query.limit(100)]
+  });
+  const counts = { favoravel: 0, contrario: 0, abstencao: 0 };
+  for (const row of result.rows) {
+    counts[row.Choice] = (counts[row.Choice] || 0) + 1;
+  }
+  return { counts, total: result.rows.length };
 }
 
 export default async ({ req, res, error }) => {
@@ -231,26 +272,152 @@ export default async ({ req, res, error }) => {
       return json(res, 200, { ok: true, message: "Solicitação enviada. Criar uma conta não significa aprovação automática." });
     }
 
-    const teamResult = await teams.listMemberships({ teamId: TEAM_ID, total: false });
-    const isConfirmedAdmin = teamResult.memberships.some(
-      (membership) => membership.userId === user.$id && membership.confirm === true
-    );
-
-    if (!isConfirmedAdmin) {
-      return json(res, 403, { ok: false, message: "Acesso restrito à equipe Administradores RUMR." });
-    }
-
-    const adminUserIds = new Set(
-      teamResult.memberships.filter((m) => m.confirm === true).map((m) => m.userId)
-    );
-
     const tablesDB = serviceDB();
     if (!tablesDB) {
       error("Variável APPWRITE_API_KEY ausente.");
       return json(res, 500, { ok: false, message: "A chave de serviço da função não está configurada." });
     }
 
+    const teamResult = await teams.listMemberships({ teamId: TEAM_ID, total: false });
+    const adminUserIds = new Set(
+      teamResult.memberships.filter((m) => m.confirm === true).map((m) => m.userId)
+    );
+    const isAdmin = adminUserIds.has(user.$id);
+    const isParlamentar = await isActiveParlamentar(tablesDB, user.$id);
     const action = body.action;
+
+    // Ações do Congresso: parlamentares propõem e votam; administradores também consultam a lista.
+    if (action === "proposals") {
+      if (!isAdmin && !isParlamentar) {
+        return json(res, 403, { ok: false, message: "Acesso restrito a parlamentares e administradores." });
+      }
+
+      const [proposalRows, voteRows, profileRows] = await Promise.all([
+        tablesDB.listRows({
+          databaseId: DATABASE_ID,
+          tableId: PROPOSALS_TABLE_ID,
+          queries: [Query.orderDesc("ProposedAt"), Query.limit(100)]
+        }),
+        tablesDB.listRows({
+          databaseId: DATABASE_ID,
+          tableId: VOTES_TABLE_ID,
+          queries: [Query.limit(100)]
+        }),
+        tablesDB.listRows({
+          databaseId: DATABASE_ID,
+          tableId: PROFILES_TABLE_ID,
+          queries: [Query.limit(100)]
+        })
+      ]);
+
+      const nameByUser = new Map(profileRows.rows.map((p) => [p.UserId, p.DisplayName]));
+      const votesByProposal = new Map();
+      for (const vote of voteRows.rows) {
+        if (!votesByProposal.has(vote.ProposalId)) votesByProposal.set(vote.ProposalId, []);
+        votesByProposal.get(vote.ProposalId).push(vote);
+      }
+
+      return json(res, 200, {
+        ok: true,
+        proposals: proposalRows.rows.map((row) => {
+          const votes = votesByProposal.get(row.$id) || [];
+          const counts = { favoravel: 0, contrario: 0, abstencao: 0 };
+          for (const vote of votes) counts[vote.Choice] = (counts[vote.Choice] || 0) + 1;
+          const mine = votes.find((vote) => vote.VoterId === user.$id);
+
+          return {
+            id: row.$id,
+            title: row.Title,
+            body: row.Body,
+            status: String(row.Status || "pending").toLowerCase(),
+            proposedAt: row.ProposedAt,
+            proposedByName: nameByUser.get(row.ProposedBy) || "Parlamentar",
+            decidedAt: row.DecidedAt || null,
+            decisionReason: row.DecisionReason || null,
+            counts,
+            total: votes.length,
+            myVote: mine ? mine.Choice : null,
+            documentSlug: row.DocumentSlug || null
+          };
+        })
+      });
+    }
+
+    if (action === "propose") {
+      if (!isParlamentar) {
+        return json(res, 403, { ok: false, message: "Apenas parlamentares podem apresentar propostas." });
+      }
+
+      const title = validateText(body.title, 5, 200);
+      const text = validateText(body.body, 50, 50000);
+      if (!title || !text) {
+        return json(res, 400, { ok: false, message: "Use um título de 5 a 200 caracteres e um texto de 50 a 50000 caracteres." });
+      }
+
+      await tablesDB.createRow({
+        databaseId: DATABASE_ID,
+        tableId: PROPOSALS_TABLE_ID,
+        rowId: ID.unique(),
+        data: {
+          Title: title,
+          Body: text,
+          Status: "pending",
+          ProposedBy: user.$id,
+          ProposedAt: new Date().toISOString()
+        }
+      });
+
+      return json(res, 200, { ok: true, message: "Proposta apresentada." });
+    }
+
+    if (action === "vote") {
+      if (!isParlamentar) {
+        return json(res, 403, { ok: false, message: "Apenas parlamentares podem votar." });
+      }
+
+      const proposalId = typeof body.proposalId === "string" ? body.proposalId : "";
+      const choice = body.choice;
+      if (!proposalId || proposalId.length > 36 || !VOTE_CHOICES.includes(choice)) {
+        return json(res, 400, { ok: false, message: "Dados de voto inválidos." });
+      }
+
+      const proposal = await tablesDB.getRow({
+        databaseId: DATABASE_ID,
+        tableId: PROPOSALS_TABLE_ID,
+        rowId: proposalId
+      });
+      if (String(proposal.Status).toLowerCase() !== "pending") {
+        return json(res, 409, { ok: false, message: "Esta proposta já foi encerrada." });
+      }
+
+      const existing = await tablesDB.listRows({
+        databaseId: DATABASE_ID,
+        tableId: VOTES_TABLE_ID,
+        queries: [Query.equal("ProposalId", proposalId), Query.equal("VoterId", user.$id), Query.limit(1)]
+      });
+      if (existing.rows.length) {
+        return json(res, 409, { ok: false, message: "Você já votou nesta proposta." });
+      }
+
+      await tablesDB.createRow({
+        databaseId: DATABASE_ID,
+        tableId: VOTES_TABLE_ID,
+        rowId: ID.unique(),
+        data: {
+          ProposalId: proposalId,
+          VoterId: user.$id,
+          Choice: choice,
+          CastAt: new Date().toISOString()
+        }
+      });
+
+      return json(res, 200, { ok: true, message: "Voto registrado." });
+    }
+
+    // Daqui em diante, só administradores.
+    if (!isAdmin) {
+      return json(res, 403, { ok: false, message: "Acesso restrito à equipe Administradores RUMR." });
+    }
 
     if (action === "stats") {
       const [members, membersActive, membersSuspended, pending, approved, rejected] = await Promise.all([
@@ -549,6 +716,139 @@ export default async ({ req, res, error }) => {
       });
 
       return json(res, 200, { ok: true, message: "Documento salvo.", rowId: savedId });
+    }
+
+    if (action === "close-proposal") {
+      const proposalId = typeof body.proposalId === "string" ? body.proposalId : "";
+      const reason = validateReason(body.reason);
+
+      if (!proposalId || proposalId.length > 36) {
+        return json(res, 400, { ok: false, message: "Proposta inválida." });
+      }
+      if (!reason) {
+        return json(res, 400, { ok: false, message: "Informe um motivo entre 10 e 300 caracteres." });
+      }
+
+      const proposal = await tablesDB.getRow({
+        databaseId: DATABASE_ID,
+        tableId: PROPOSALS_TABLE_ID,
+        rowId: proposalId
+      });
+      if (String(proposal.Status).toLowerCase() !== "pending") {
+        return json(res, 409, { ok: false, message: "Esta proposta já foi encerrada." });
+      }
+
+      const tally = await tallyVotes(tablesDB, proposalId);
+      if (tally.total < QUORUM) {
+        return json(res, 409, {
+          ok: false,
+          message: `Quórum mínimo de ${QUORUM} votos não atingido (${tally.total} até agora).`
+        });
+      }
+
+      const approved = tally.counts.favoravel > tally.counts.contrario;
+      const newStatus = approved ? "approved" : "rejected";
+
+      await tablesDB.updateRow({
+        databaseId: DATABASE_ID,
+        tableId: PROPOSALS_TABLE_ID,
+        rowId: proposalId,
+        data: {
+          Status: newStatus,
+          DecidedAt: new Date().toISOString(),
+          DecidedBy: user.$id,
+          DecisionReason: reason,
+          VotesFor: tally.counts.favoravel,
+          VotesAgainst: tally.counts.contrario,
+          VotesAbstain: tally.counts.abstencao
+        }
+      });
+
+      await logAdminAction(tablesDB, {
+        actorId: user.$id,
+        action: "proposal-close",
+        targetUserId: proposal.ProposedBy,
+        targetRowId: proposalId,
+        reason
+      });
+
+      return json(res, 200, {
+        ok: true,
+        message: approved ? "Proposta aprovada." : "Proposta rejeitada."
+      });
+    }
+
+    if (action === "publish-proposal") {
+      const proposalId = typeof body.proposalId === "string" ? body.proposalId : "";
+      const reason = validateReason(body.reason);
+
+      if (!proposalId || proposalId.length > 36) {
+        return json(res, 400, { ok: false, message: "Proposta inválida." });
+      }
+      if (!reason) {
+        return json(res, 400, { ok: false, message: "Informe um motivo entre 10 e 300 caracteres." });
+      }
+
+      const proposal = await tablesDB.getRow({
+        databaseId: DATABASE_ID,
+        tableId: PROPOSALS_TABLE_ID,
+        rowId: proposalId
+      });
+      const status = String(proposal.Status).toLowerCase();
+      if (status === "pending") {
+        return json(res, 409, { ok: false, message: "Só propostas encerradas podem ser publicadas." });
+      }
+      if (proposal.DocumentSlug) {
+        return json(res, 409, { ok: false, message: "Esta proposta já foi publicada." });
+      }
+
+      const now = new Date().toISOString();
+      const slug = `proposta-${proposalId.toLowerCase()}`;
+      const situation = status === "approved" ? "Aprovada" : "Rejeitada";
+      const content = [
+        `# ${proposal.Title}`,
+        "",
+        proposal.Body,
+        "",
+        "---",
+        "",
+        `**Situação:** ${situation}`,
+        "",
+        `**Votos:** favoráveis ${proposal.VotesFor || 0}, contrários ${proposal.VotesAgainst || 0}, abstenções ${proposal.VotesAbstain || 0}.`
+      ].join("\n");
+
+      await tablesDB.createRow({
+        databaseId: DATABASE_ID,
+        tableId: DOCUMENTS_TABLE_ID,
+        rowId: ID.unique(),
+        data: {
+          Slug: slug,
+          Title: proposal.Title,
+          Category: "instituicao",
+          Institution: "Congresso",
+          Content: content,
+          Published: true,
+          PublishedAt: now,
+          UpdatedAt: now
+        }
+      });
+
+      await tablesDB.updateRow({
+        databaseId: DATABASE_ID,
+        tableId: PROPOSALS_TABLE_ID,
+        rowId: proposalId,
+        data: { DocumentSlug: slug, PublishedAt: now }
+      });
+
+      await logAdminAction(tablesDB, {
+        actorId: user.$id,
+        action: "proposal-publish",
+        targetUserId: proposal.ProposedBy,
+        targetRowId: proposalId,
+        reason
+      });
+
+      return json(res, 200, { ok: true, message: "Proposta publicada no site.", slug });
     }
 
     if (action === "review") {
