@@ -68,7 +68,8 @@
     }
 
     if (execution.responseStatusCode < 200 || execution.responseStatusCode >= 300 || !result.ok) {
-      throw new Error(result.message || "A operação não foi autorizada.");
+      const detail = result.message || `Falha na Function (status ${execution.responseStatusCode}).`;
+      throw new Error(detail + (execution.errors ? " " + execution.errors.slice(0, 200) : ""));
     }
     return result;
   }
