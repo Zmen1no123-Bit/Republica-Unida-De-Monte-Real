@@ -7,16 +7,25 @@ const DATABASE_ID = "6aeb8a27000848e802b4";
 const REQUESTS_TABLE_ID = "membership_requests";
 const PROFILES_TABLE_ID = "member_profiles";
 const ADMIN_ACTIONS_TABLE_ID = "admin_actions";
+const APPOINTMENTS_TABLE_ID = "appointments";
 
 const PENDING_VALUES = ["pending", "Pending"];
 const APPROVED_VALUES = ["approved", "Approved"];
 const REJECTED_VALUES = ["rejected", "Rejected"];
 
+// Cargos permitidos. Qualquer outro valor é recusado pelo servidor.
+const POSITIONS = {
+  "Presidente": "Presidência",
+  "Vice-presidente": "Presidência",
+  "Ministro": "Ministérios",
+  "Parlamentar": "Congresso",
+  "Magistrado": "Supremo Tribunal"
+};
+
 function json(res, statusCode, body) {
   return res.json(body, statusCode);
 }
 
-// Identifica quem enviou a solicitação pela permissão de leitura gravada no formulário.
 function applicantIdFrom(row) {
   for (const permission of row.$permissions || []) {
     const match = /^read\("user:([^"]+)"\)$/.exec(permission);
@@ -31,7 +40,6 @@ function validateReason(reason) {
   return text;
 }
 
-// Cria o perfil do membro. Se já existir (índice único em UserId), não repete a criação.
 async function createMemberProfile(tablesDB, userId, displayName) {
   const last = await tablesDB.listRows({
     databaseId: DATABASE_ID,
@@ -63,7 +71,6 @@ async function createMemberProfile(tablesDB, userId, displayName) {
   return "created";
 }
 
-// Grava uma linha no registro de ações administrativas. Só a Function escreve nessa tabela.
 async function logAdminAction(tablesDB, { actorId, action, targetUserId, targetRowId, reason }) {
   await tablesDB.createRow({
     databaseId: DATABASE_ID,
@@ -79,7 +86,6 @@ async function logAdminAction(tablesDB, { actorId, action, targetUserId, targetR
   });
 }
 
-// Conta as linhas que atendem ao filtro, sem buscar todas.
 async function countRows(tablesDB, tableId, queries = []) {
   const result = await tablesDB.listRows({
     databaseId: DATABASE_ID,
@@ -87,6 +93,35 @@ async function countRows(tablesDB, tableId, queries = []) {
     queries: [...queries, Query.limit(1)]
   });
   return result.total;
+}
+
+// Cargo ativo do membro, ou null.
+async function findActiveAppointment(tablesDB, userId) {
+  const result = await tablesDB.listRows({
+    databaseId: DATABASE_ID,
+    tableId: APPOINTMENTS_TABLE_ID,
+    queries: [Query.equal("UserId", userId), Query.isNull("EndedAt"), Query.limit(1)]
+  });
+  return result.rows[0] || null;
+}
+
+// Encerra todos os cargos ativos do membro. Usado quando a conta é suspensa.
+async function endActiveAppointments(tablesDB, userId, reason) {
+  const result = await tablesDB.listRows({
+    databaseId: DATABASE_ID,
+    tableId: APPOINTMENTS_TABLE_ID,
+    queries: [Query.equal("UserId", userId), Query.isNull("EndedAt"), Query.limit(100)]
+  });
+  const now = new Date().toISOString();
+  for (const row of result.rows) {
+    await tablesDB.updateRow({
+      databaseId: DATABASE_ID,
+      tableId: APPOINTMENTS_TABLE_ID,
+      rowId: row.$id,
+      data: { EndedAt: now, EndedReason: reason }
+    });
+  }
+  return result.rows.length;
 }
 
 export default async ({ req, res, error }) => {
@@ -185,22 +220,36 @@ export default async ({ req, res, error }) => {
     }
 
     if (action === "members") {
-      const result = await tablesDB.listRows({
-        databaseId: DATABASE_ID,
-        tableId: PROFILES_TABLE_ID,
-        queries: [Query.orderAsc("MemberNumber"), Query.limit(100)]
-      });
+      const [profiles, activeAppointments] = await Promise.all([
+        tablesDB.listRows({
+          databaseId: DATABASE_ID,
+          tableId: PROFILES_TABLE_ID,
+          queries: [Query.orderAsc("MemberNumber"), Query.limit(100)]
+        }),
+        tablesDB.listRows({
+          databaseId: DATABASE_ID,
+          tableId: APPOINTMENTS_TABLE_ID,
+          queries: [Query.isNull("EndedAt"), Query.limit(100)]
+        })
+      ]);
+
+      const positionByUser = new Map(activeAppointments.rows.map((row) => [row.UserId, row]));
 
       return json(res, 200, {
         ok: true,
-        members: result.rows.map((row) => ({
-          rowId: row.$id,
-          userId: row.UserId,
-          displayName: row.DisplayName || "",
-          memberNumber: row.MemberNumber,
-          joinedAt: row.JoinedAt || null,
-          accountStatus: String(row.AccountStatus || "active").toLowerCase()
-        }))
+        members: profiles.rows.map((row) => {
+          const appointment = positionByUser.get(row.UserId);
+          return {
+            rowId: row.$id,
+            userId: row.UserId,
+            displayName: row.DisplayName || "",
+            memberNumber: row.MemberNumber,
+            joinedAt: row.JoinedAt || null,
+            accountStatus: String(row.AccountStatus || "active").toLowerCase(),
+            position: appointment ? appointment.Position : null,
+            institution: appointment ? appointment.Institution : null
+          };
+        })
       });
     }
 
@@ -249,6 +298,10 @@ export default async ({ req, res, error }) => {
         }
       });
 
+      if (newStatus === "suspended") {
+        await endActiveAppointments(tablesDB, targetUserId, "Conta suspensa.");
+      }
+
       await logAdminAction(tablesDB, {
         actorId: user.$id,
         action,
@@ -262,6 +315,93 @@ export default async ({ req, res, error }) => {
         message: newStatus === "suspended" ? "Conta suspensa." : "Conta reativada.",
         member: { userId: targetUserId, accountStatus: newStatus }
       });
+    }
+
+    if (action === "appoint") {
+      const targetUserId = typeof body.userId === "string" ? body.userId : "";
+      const position = body.position;
+
+      if (!targetUserId || targetUserId.length > 36) {
+        return json(res, 400, { ok: false, message: "Membro inválido." });
+      }
+      if (!Object.prototype.hasOwnProperty.call(POSITIONS, position)) {
+        return json(res, 400, { ok: false, message: "Cargo inválido." });
+      }
+
+      const profiles = await tablesDB.listRows({
+        databaseId: DATABASE_ID,
+        tableId: PROFILES_TABLE_ID,
+        queries: [Query.equal("UserId", targetUserId), Query.limit(1)]
+      });
+      if (!profiles.rows.length) {
+        return json(res, 404, { ok: false, message: "Perfil de membro não encontrado." });
+      }
+      if (String(profiles.rows[0].AccountStatus).toLowerCase() !== "active") {
+        return json(res, 409, { ok: false, message: "Só membros com conta ativa podem ser nomeados." });
+      }
+      if (await findActiveAppointment(tablesDB, targetUserId)) {
+        return json(res, 409, { ok: false, message: "Este membro já ocupa um cargo. Exonere antes de nomear outro." });
+      }
+
+      const created = await tablesDB.createRow({
+        databaseId: DATABASE_ID,
+        tableId: APPOINTMENTS_TABLE_ID,
+        rowId: ID.unique(),
+        data: {
+          UserId: targetUserId,
+          Position: position,
+          Institution: POSITIONS[position],
+          StartedAt: new Date().toISOString(),
+          AppointedBy: user.$id
+        }
+      });
+
+      await logAdminAction(tablesDB, {
+        actorId: user.$id,
+        action: "appoint",
+        targetUserId,
+        targetRowId: created.$id,
+        reason: null
+      });
+
+      return json(res, 200, { ok: true, message: "Cargo atribuído." });
+    }
+
+    if (action === "dismiss") {
+      const targetUserId = typeof body.userId === "string" ? body.userId : "";
+      const reason = validateReason(body.reason);
+
+      if (!targetUserId || targetUserId.length > 36) {
+        return json(res, 400, { ok: false, message: "Membro inválido." });
+      }
+      if (!reason) {
+        return json(res, 400, { ok: false, message: "Informe um motivo entre 10 e 300 caracteres." });
+      }
+      if (targetUserId === user.$id) {
+        return json(res, 403, { ok: false, message: "Você não pode alterar o próprio cargo." });
+      }
+
+      const active = await findActiveAppointment(tablesDB, targetUserId);
+      if (!active) {
+        return json(res, 404, { ok: false, message: "Este membro não ocupa cargo ativo." });
+      }
+
+      await tablesDB.updateRow({
+        databaseId: DATABASE_ID,
+        tableId: APPOINTMENTS_TABLE_ID,
+        rowId: active.$id,
+        data: { EndedAt: new Date().toISOString(), EndedReason: reason }
+      });
+
+      await logAdminAction(tablesDB, {
+        actorId: user.$id,
+        action: "dismiss",
+        targetUserId,
+        targetRowId: active.$id,
+        reason
+      });
+
+      return json(res, 200, { ok: true, message: "Cargo encerrado." });
     }
 
     if (action === "review") {
