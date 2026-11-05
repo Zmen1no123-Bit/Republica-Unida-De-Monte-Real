@@ -4,6 +4,7 @@ const PROJECT_ID = process.env.APPWRITE_FUNCTION_PROJECT_ID;
 const ENDPOINT = process.env.APPWRITE_FUNCTION_API_ENDPOINT;
 const TEAM_ID = "rumr-admin";
 const DATABASE_ID = "6aeb8a27000848e802b4";
+const DOCUMENTS_TABLE_ID = "documents";
 const REQUESTS_TABLE_ID = "membership_requests";
 const PROFILES_TABLE_ID = "member_profiles";
 const ADMIN_ACTIONS_TABLE_ID = "admin_actions";
