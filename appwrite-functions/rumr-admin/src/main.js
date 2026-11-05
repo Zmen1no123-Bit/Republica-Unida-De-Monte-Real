@@ -50,27 +50,25 @@ async function createMemberProfile(tablesDB, userId, displayName) {
   const nextNumber = last.rows.length ? Number(last.rows[0].MemberNumber) + 1 : 1;
   const now = new Date().toISOString();
 
-  try {
-    await tablesDB.createRow({
-      databaseId: DATABASE_ID,
-      tableId: PROFILES_TABLE_ID,
-      rowId: ID.unique(),
-      data: {
-        UserId: userId,
-        DisplayName: displayName || "Membro",
-        MemberNumber: nextNumber,
-        JoinedAt: now,
-        AccountStatus: "active",
-        UpdatedAt: now
-      },
-      permissions: [Permission.read(Role.user(userId))]
-    });
-  } catch (err) {
-    if (err?.code === 409) return "already-exists";
-    throw err;
-  }
-  return "created";
-}
+      const result = await publicDB.listRows({
+        databaseId: DATABASE_ID,
+        tableId: DOCUMENTS_TABLE_ID,
+        queries: [Query.equal("Published", [true]), Query.orderAsc("Slug"), Query.limit(100)]
+      });
+
+      return json(res, 200, {
+        ok: true,
+        documents: result.rows.map((row) => ({
+          slug: row.Slug,
+          title: row.Title,
+          category: row.Category,
+          institution: row.Institution || "",
+          number: row.Number ?? null,
+          content: row.Content,
+          publishedAt: row.PublishedAt || null,
+          updatedAt: row.UpdatedAt || null
+        }))
+      });
 
 async function logAdminAction(tablesDB, { actorId, action, targetUserId, targetRowId, reason }) {
   await tablesDB.createRow({
