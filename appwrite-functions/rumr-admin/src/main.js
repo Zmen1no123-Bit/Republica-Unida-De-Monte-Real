@@ -7,6 +7,11 @@ const DATABASE_ID = "6aeb8a27000848e802b4";
 const REQUESTS_TABLE_ID = "membership_requests";
 const PROFILES_TABLE_ID = "member_profiles";
 
+// O Status pode estar em minúsculas (gravado pela função) ou com inicial maiúscula (padrão da coluna).
+const PENDING_VALUES = ["pending", "Pending"];
+const APPROVED_VALUES = ["approved", "Approved"];
+const REJECTED_VALUES = ["rejected", "Rejected"];
+
 function json(res, statusCode, body) {
   return res.json(body, statusCode);
 }
@@ -50,6 +55,16 @@ async function createMemberProfile(tablesDB, userId, displayName) {
     throw err;
   }
   return "created";
+}
+
+// Conta as linhas que atendem ao filtro. O total vem da resposta, sem buscar todas as linhas.
+async function countRows(tablesDB, tableId, queries = []) {
+  const result = await tablesDB.listRows({
+    databaseId: DATABASE_ID,
+    tableId,
+    queries: [...queries, Query.limit(1)]
+  });
+  return result.total;
 }
 
 export default async ({ req, res, error }) => {
@@ -105,6 +120,22 @@ export default async ({ req, res, error }) => {
     const tablesDB = new TablesDB(serviceClient);
     const body = req.bodyJson || {};
     const action = body.action;
+
+    if (action === "stats") {
+      const [members, membersActive, membersSuspended, pending, approved, rejected] = await Promise.all([
+        countRows(tablesDB, PROFILES_TABLE_ID),
+        countRows(tablesDB, PROFILES_TABLE_ID, [Query.equal("AccountStatus", ["active"])]),
+        countRows(tablesDB, PROFILES_TABLE_ID, [Query.equal("AccountStatus", ["suspended"])]),
+        countRows(tablesDB, REQUESTS_TABLE_ID, [Query.equal("Status", PENDING_VALUES)]),
+        countRows(tablesDB, REQUESTS_TABLE_ID, [Query.equal("Status", APPROVED_VALUES)]),
+        countRows(tablesDB, REQUESTS_TABLE_ID, [Query.equal("Status", REJECTED_VALUES)])
+      ]);
+
+      return json(res, 200, {
+        ok: true,
+        stats: { members, membersActive, membersSuspended, pending, approved, rejected }
+      });
+    }
 
     if (action === "list") {
       const result = await tablesDB.listRows({
