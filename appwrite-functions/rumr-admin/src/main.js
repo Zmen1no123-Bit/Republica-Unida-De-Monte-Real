@@ -22,7 +22,6 @@ export default async ({ req, res, log, error }) => {
     }
 
     if (!PROJECT_ID || !ENDPOINT) {
-      error("Missing Appwrite function environment configuration.");
       return json(res, 500, { ok: false, message: "Configuração interna incompleta." });
     }
 
@@ -34,17 +33,15 @@ export default async ({ req, res, log, error }) => {
     const account = new Account(userClient);
     const teams = new Teams(userClient);
 
-    log("DIAG 1: antes de account.get");
     const user = await account.get();
-    log("DIAG 2: account.get concluído");
+    log("DIAG 2: usuário identificado");
 
     if (!user.emailVerification) {
       return json(res, 403, { ok: false, message: "Verifique seu e-mail antes de acessar a administração." });
     }
 
-    log("DIAG 3: antes de teams.listMemberships");
     const teamResult = await teams.listMemberships({ teamId: TEAM_ID, total: false });
-    log("DIAG 4: teams.listMemberships concluído");
+    log("DIAG 4: equipe consultada");
 
     const isConfirmedAdmin = teamResult.memberships.some(
       (membership) => membership.userId === user.$id && membership.confirm === true
@@ -54,10 +51,9 @@ export default async ({ req, res, log, error }) => {
       return json(res, 403, { ok: false, message: "Acesso restrito à equipe Administradores RUMR." });
     }
 
-    log("DIAG 5: verificando chave de serviço");
     const functionKey = process.env.APPWRITE_API_KEY;
     if (!functionKey) {
-      error("Missing service key: defina APPWRITE_API_KEY nas variáveis da Function.");
+      error("Variável APPWRITE_API_KEY ausente.");
       return json(res, 500, { ok: false, message: "A chave de serviço da função não está configurada." });
     }
 
@@ -71,13 +67,12 @@ export default async ({ req, res, log, error }) => {
     const action = body.action;
 
     if (action === "list") {
-      log("DIAG 6: antes de tablesDB.listRows");
       const result = await tablesDB.listRows({
         databaseId: DATABASE_ID,
         tableId: TABLE_ID,
         queries: [Query.orderDesc("$createdAt"), Query.limit(100)]
       });
-      log("DIAG 7: tablesDB.listRows concluído");
+      log("DIAG 7: listagem concluída");
 
       return json(res, 200, {
         ok: true,
@@ -85,7 +80,7 @@ export default async ({ req, res, log, error }) => {
           id: row.$id,
           displayName: row.DisplayName || "",
           motivation: row.Motivation || "",
-          status: (row.Status || "pending").toLowerCase(),
+          status: String(row.Status || "pending").toLowerCase(),
           createdAt: row.$createdAt,
           reviewedAt: row.ReviewedAt || null,
           reviewedBy: row.ReviewedBy || null
@@ -94,6 +89,7 @@ export default async ({ req, res, log, error }) => {
     }
 
     if (action === "review") {
+      log("DIAG 8: início da revisão");
       const rowId = typeof body.rowId === "string" ? body.rowId : "";
       const status = body.status;
 
@@ -111,26 +107,20 @@ export default async ({ req, res, log, error }) => {
           ReviewedBy: user.$id
         }
       });
+      log("DIAG 9: updateRow concluído");
 
       return json(res, 200, {
         ok: true,
         message: status === "approved" ? "Solicitação aprovada." : "Solicitação rejeitada.",
-        request: { id: updated.$id, status: (updated.Status || status).toLowerCase() }
+        request: { id: updated.$id, status }
       });
     }
 
     return json(res, 400, { ok: false, message: "Ação desconhecida." });
-  }   } catch (err) {
+  } catch (err) {
     const detail = err?.message || String(err);
     error("RUMR admin function error: " + (err?.stack || detail));
     if (err?.cause) error("RUMR admin function cause: " + (err.cause?.stack || String(err.cause)));
     return json(res, 500, { ok: false, message: "Diagnóstico: " + detail });
-  }
-};
-
-    if (code === 401 || code === 403) {
-      return json(res, code, { ok: false, message: "Acesso negado. Confira a sessão e as permissões da função." });
-    }
-    return json(res, 500, { ok: false, message: "Não foi possível concluir a operação. Consulte os logs da função." });
   }
 };
