@@ -154,6 +154,47 @@ export default async ({ req, res, error }) => {
       return json(res, 403, { ok: false, message: "Verifique seu e-mail antes de acessar a administração." });
     }
 
+        const payload = req.bodyJson || {};
+    if (payload.action === "request") {
+      const displayName = typeof payload.displayName === "string" ? payload.displayName.trim() : "";
+      const motivation = typeof payload.motivation === "string" ? payload.motivation.trim() : "";
+
+      if (displayName.length < 2 || displayName.length > 60 || motivation.length < 10 || motivation.length > 500) {
+        return json(res, 400, { ok: false, message: "Use um nome de 2 a 60 caracteres e uma mensagem de 10 a 500 caracteres." });
+      }
+
+      const requestKey = process.env.APPWRITE_API_KEY;
+      if (!requestKey) {
+        error("Variável APPWRITE_API_KEY ausente.");
+        return json(res, 500, { ok: false, message: "Configuração interna incompleta." });
+      }
+
+      const requestClient = new Client()
+        .setEndpoint(ENDPOINT)
+        .setProject(PROJECT_ID)
+        .setKey(requestKey);
+      const requestDB = new TablesDB(requestClient);
+
+      const profiles = await requestDB.listRows({
+        databaseId: DATABASE_ID,
+        tableId: PROFILES_TABLE_ID,
+        queries: [Query.equal("UserId", user.$id), Query.limit(1)]
+      });
+      if (profiles.rows.length && String(profiles.rows[0].AccountStatus).toLowerCase() === "suspended") {
+        return json(res, 403, { ok: false, message: "Sua conta está suspensa. Não é possível enviar novas solicitações." });
+      }
+
+      await requestDB.createRow({
+        databaseId: DATABASE_ID,
+        tableId: REQUESTS_TABLE_ID,
+        rowId: ID.unique(),
+        data: { DisplayName: displayName, Motivation: motivation },
+        permissions: [Permission.read(Role.user(user.$id))]
+      });
+
+      return json(res, 200, { ok: true, message: "Solicitação enviada. Criar uma conta não significa aprovação automática." });
+    }
+
     const teamResult = await teams.listMemberships({ teamId: TEAM_ID, total: false });
     const isConfirmedAdmin = teamResult.memberships.some(
       (membership) => membership.userId === user.$id && membership.confirm === true
