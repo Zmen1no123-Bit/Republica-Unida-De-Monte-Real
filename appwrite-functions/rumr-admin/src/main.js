@@ -131,6 +131,42 @@ export default async ({ req, res, error }) => {
       return json(res, 405, { ok: false, message: "Método não permitido." });
     }
 
+        // Rota pública: documentos publicados, sem login. Só devolve campos seguros.
+    const publicBody = req.bodyJson || {};
+    if (publicBody.action === "public-documents") {
+      const publicKey = process.env.APPWRITE_API_KEY;
+      if (!publicKey) {
+        error("Variável APPWRITE_API_KEY ausente.");
+        return json(res, 500, { ok: false, message: "Configuração interna incompleta." });
+      }
+
+      const publicClient = new Client()
+        .setEndpoint(ENDPOINT)
+        .setProject(PROJECT_ID)
+        .setKey(publicKey);
+      const publicDB = new TablesDB(publicClient);
+
+      const result = await publicDB.listRows({
+        databaseId: DATABASE_ID,
+        tableId: DOCUMENTS_TABLE_ID,
+        queries: [Query.equal("Published", [true]), Query.orderAsc("Slug"), Query.limit(100)]
+      });
+
+      return json(res, 200, {
+        ok: true,
+        documents: result.rows.map((row) => ({
+          slug: row.Slug,
+          title: row.Title,
+          category: row.Category,
+          institution: row.Institution || "",
+          number: row.Number ?? null,
+          content: row.Content,
+          publishedAt: row.PublishedAt || null,
+          updatedAt: row.UpdatedAt || null
+        }))
+      });
+    }
+
     const jwt = req.headers["x-appwrite-user-jwt"];
     if (!jwt) {
       return json(res, 401, { ok: false, message: "Faça login para continuar." });
