@@ -10,7 +10,7 @@ function json(res, statusCode, body) {
   return res.json(body, statusCode);
 }
 
-export default async ({ req, res, log, error }) => {
+export default async ({ req, res, error }) => {
   try {
     if (req.method !== "POST") {
       return json(res, 405, { ok: false, message: "Método não permitido." });
@@ -22,6 +22,7 @@ export default async ({ req, res, log, error }) => {
     }
 
     if (!PROJECT_ID || !ENDPOINT) {
+      error("Variáveis de ambiente do Appwrite ausentes.");
       return json(res, 500, { ok: false, message: "Configuração interna incompleta." });
     }
 
@@ -34,15 +35,12 @@ export default async ({ req, res, log, error }) => {
     const teams = new Teams(userClient);
 
     const user = await account.get();
-    log("DIAG 2: usuário identificado");
 
     if (!user.emailVerification) {
       return json(res, 403, { ok: false, message: "Verifique seu e-mail antes de acessar a administração." });
     }
 
     const teamResult = await teams.listMemberships({ teamId: TEAM_ID, total: false });
-    log("DIAG 4: equipe consultada");
-
     const isConfirmedAdmin = teamResult.memberships.some(
       (membership) => membership.userId === user.$id && membership.confirm === true
     );
@@ -72,7 +70,6 @@ export default async ({ req, res, log, error }) => {
         tableId: TABLE_ID,
         queries: [Query.orderDesc("$createdAt"), Query.limit(100)]
       });
-      log("DIAG 7: listagem concluída");
 
       return json(res, 200, {
         ok: true,
@@ -89,7 +86,6 @@ export default async ({ req, res, log, error }) => {
     }
 
     if (action === "review") {
-      log("DIAG 8: início da revisão");
       const rowId = typeof body.rowId === "string" ? body.rowId : "";
       const status = body.status;
 
@@ -107,7 +103,6 @@ export default async ({ req, res, log, error }) => {
           ReviewedBy: user.$id
         }
       });
-      log("DIAG 9: updateRow concluído");
 
       return json(res, 200, {
         ok: true,
@@ -118,9 +113,14 @@ export default async ({ req, res, log, error }) => {
 
     return json(res, 400, { ok: false, message: "Ação desconhecida." });
   } catch (err) {
-    const detail = err?.message || String(err);
-    error("RUMR admin function error: " + (err?.stack || detail));
-    if (err?.cause) error("RUMR admin function cause: " + (err.cause?.stack || String(err.cause)));
-    return json(res, 500, { ok: false, message: "Diagnóstico: " + detail });
+    error("RUMR admin function error: " + (err?.stack || err?.message || String(err)));
+    const code = Number(err?.code) || 500;
+    if (code === 404) {
+      return json(res, 404, { ok: false, message: "Tabela ou solicitação não encontrada. Confira a configuração do banco." });
+    }
+    if (code === 401 || code === 403) {
+      return json(res, code, { ok: false, message: "Acesso negado. Confira a sessão e as permissões da função." });
+    }
+    return json(res, 500, { ok: false, message: "Não foi possível concluir a operação. Consulte os logs da função." });
   }
 };
