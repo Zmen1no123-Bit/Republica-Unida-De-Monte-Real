@@ -444,6 +444,105 @@ export default async ({ req, res, error }) => {
 
       return json(res, 200, { ok: true, message: "Cargo encerrado." });
     }
+    
+        if (action === "documents") {
+      const result = await tablesDB.listRows({
+        databaseId: DATABASE_ID,
+        tableId: DOCUMENTS_TABLE_ID,
+        queries: [Query.equal("Published", [true]), Query.orderAsc("Slug"), Query.limit(100)]
+      });
+
+      return json(res, 200, {
+        ok: true,
+        documents: result.rows.map((row) => ({
+          slug: row.Slug,
+          title: row.Title,
+          category: row.Category,
+          institution: row.Institution || "",
+          number: row.Number ?? null,
+          content: row.Content,
+          publishedAt: row.PublishedAt || null,
+          updatedAt: row.UpdatedAt || null
+        }))
+      });
+    }
+
+    if (action === "documents-admin") {
+      const result = await tablesDB.listRows({
+        databaseId: DATABASE_ID,
+        tableId: DOCUMENTS_TABLE_ID,
+        queries: [Query.orderAsc("Slug"), Query.limit(100)]
+      });
+
+      return json(res, 200, {
+        ok: true,
+        documents: result.rows.map((row) => ({
+          rowId: row.$id,
+          slug: row.Slug,
+          title: row.Title,
+          category: row.Category,
+          institution: row.Institution || "",
+          number: row.Number ?? null,
+          content: row.Content,
+          published: row.Published === true,
+          publishedAt: row.PublishedAt || null,
+          updatedAt: row.UpdatedAt || null
+        }))
+      });
+    }
+
+    if (action === "document-save") {
+      const rowId = typeof body.rowId === "string" ? body.rowId : "";
+      const title = typeof body.title === "string" ? body.title.trim() : "";
+      const content = typeof body.content === "string" ? body.content : "";
+      const institution = typeof body.institution === "string" ? body.institution.trim() : "";
+      const published = body.published === true;
+      const reason = validateReason(body.reason);
+
+      if (!title || title.length > 200) {
+        return json(res, 400, { ok: false, message: "Título inválido (até 200 caracteres)." });
+      }
+      if (!content || content.length > 100000) {
+        return json(res, 400, { ok: false, message: "Conteúdo vazio ou acima de 100000 caracteres." });
+      }
+      if (!reason) {
+        return json(res, 400, { ok: false, message: "Informe um motivo entre 10 e 300 caracteres." });
+      }
+
+      const now = new Date().toISOString();
+      const data = { Title: title, Content: content, Institution: institution, Published: published, UpdatedAt: now };
+
+      let savedId = rowId;
+      if (rowId) {
+        await tablesDB.updateRow({ databaseId: DATABASE_ID, tableId: DOCUMENTS_TABLE_ID, rowId, data });
+      } else {
+        const slug = typeof body.slug === "string" ? body.slug.trim().toLowerCase() : "";
+        const category = typeof body.category === "string" ? body.category.trim() : "";
+        if (!/^[a-z0-9-]{3,80}$/.test(slug)) {
+          return json(res, 400, { ok: false, message: "Identificador inválido: use letras minúsculas, números e hífens (3 a 80 caracteres)." });
+        }
+        if (!["decreto", "ministerio", "instituicao", "constituicao", "regimento"].includes(category)) {
+          return json(res, 400, { ok: false, message: "Categoria inválida." });
+        }
+        const created = await tablesDB.createRow({
+          databaseId: DATABASE_ID,
+          tableId: DOCUMENTS_TABLE_ID,
+          rowId: ID.unique(),
+          data: { ...data, Slug: slug, Category: category, PublishedAt: published ? now : null }
+        });
+        savedId = created.$id;
+      }
+
+      await logAdminAction(tablesDB, {
+        actorId: user.$id,
+        action: rowId ? "document-update" : "document-create",
+        targetUserId: user.$id,
+        targetRowId: savedId,
+        reason
+      });
+
+      return json(res, 200, { ok: true, message: "Documento salvo.", rowId: savedId });
+    }
 
     if (action === "review") {
       const rowId = typeof body.rowId === "string" ? body.rowId : "";
