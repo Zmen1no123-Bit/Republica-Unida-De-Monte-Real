@@ -4,7 +4,11 @@
   "use strict";
 
   const container = document.getElementById("memberProfile");
-  if (!container || !window.Appwrite || !window.Appwrite.Databases) return;
+  if (!container) return;
+  if (!window.Appwrite || !window.Appwrite.Databases) {
+    container.innerHTML = '<p class="notice">O serviço de perfil não carregou. Atualize a página.</p>';
+    return;
+  }
 
   const PROJECT_ID = "6aeb2aec002a69ad90ef";
   const ENDPOINT = "https://fra.cloud.appwrite.io/v1";
@@ -54,8 +58,7 @@
     addRow("Nome de exibição", profile.DisplayName || "Não informado");
     addRow("Número de membro", String(profile.MemberNumber));
     addRow("Data de ingresso", formatDate(profile.JoinedAt));
-    const active = profile.AccountStatus === "active";
-    addRow("Situação da conta", active ? "Ativa" : "Suspensa", active ? "active" : "suspended");
+    addRow("Situação da conta", "Ativa", "active");
   }
 
   async function load() {
@@ -77,7 +80,13 @@
         return;
       }
 
-      renderProfile(result.documents[0]);
+      const profile = result.documents[0];
+      if (profile.AccountStatus === "suspended") {
+        showNotice("Sua conta está suspensa. A área de membros e o envio de novas solicitações ficam indisponíveis enquanto a suspensão durar. Procure a administração para esclarecimentos.");
+        return;
+      }
+
+      renderProfile(profile);
     } catch (error) {
       console.error("RUMR member profile:", error);
       showNotice("Não foi possível carregar seu perfil. Atualize a página e tente novamente.");
