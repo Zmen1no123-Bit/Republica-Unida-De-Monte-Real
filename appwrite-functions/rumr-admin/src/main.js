@@ -120,14 +120,14 @@ export default async ({ req, res, log, error }) => {
     }
 
     return json(res, 400, { ok: false, message: "Ação desconhecida." });
-  } catch (err) {
-    error("RUMR admin function error: " + (err?.stack || err?.message || String(err)));
-    if (err?.cause) error("RUMR admin function cause: " + (err.cause?.stack || err.cause?.message || String(err.cause)));
+  }   } catch (err) {
+    const detail = err?.message || String(err);
+    error("RUMR admin function error: " + (err?.stack || detail));
+    if (err?.cause) error("RUMR admin function cause: " + (err.cause?.stack || String(err.cause)));
+    return json(res, 500, { ok: false, message: "Diagnóstico: " + detail });
+  }
+};
 
-    const code = Number(err?.code) || 500;
-    if (code === 404) {
-      return json(res, 404, { ok: false, message: "Tabela ou solicitação não encontrada. Confira a configuração do banco." });
-    }
     if (code === 401 || code === 403) {
       return json(res, code, { ok: false, message: "Acesso negado. Confira a sessão e as permissões da função." });
     }
