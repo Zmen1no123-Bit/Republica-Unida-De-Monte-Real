@@ -148,13 +148,14 @@ async function endActiveAppointments(tablesDB, userId, reason) {
 }
 
 // Verifica se o usuário ocupa o cargo de Parlamentar com nomeação ativa.
+// Verifica se o usuário ocupa cargo com direito a propor e votar (Parlamentar ou Presidente).
 async function isActiveParlamentar(tablesDB, userId) {
   const result = await tablesDB.listRows({
     databaseId: DATABASE_ID,
     tableId: APPOINTMENTS_TABLE_ID,
     queries: [
       Query.equal("UserId", userId),
-      Query.equal("Position", ["Parlamentar"]),
+      Query.equal("Position", ["Parlamentar", "Presidente"]),
       Query.isNull("EndedAt"),
       Query.limit(1)
     ]
