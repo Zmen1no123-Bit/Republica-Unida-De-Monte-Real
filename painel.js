@@ -20,6 +20,11 @@
     .setProject(PROJECT_ID);
   const account = new Appwrite.Account(client);
   const databases = new Appwrite.Databases(client);
+  const requestBlock = document.getElementById("requestBlock");
+
+  function setRequestVisible(visible) {
+    if (requestBlock) requestBlock.style.display = visible ? "" : "none";
+  }
 
   function showNotice(text) {
     container.replaceChildren();
@@ -62,6 +67,7 @@
   }
 
   async function load() {
+    setRequestVisible(false);
     try {
       const user = await account.get();
       if (!user.emailVerification) {
@@ -77,6 +83,7 @@
 
       if (!result.documents.length) {
         showNotice("Sua solicitação ainda está em análise. Seu perfil de membro aparecerá aqui depois da aprovação.");
+        setRequestVisible(true);
         return;
       }
 
