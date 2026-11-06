@@ -6,7 +6,12 @@
   const FUNCTION_ID = "rumr-admin";
 
   const box = document.getElementById("adminLinks");
-  if (!box || !window.Appwrite) return;
+  const linkAdmin = document.getElementById("linkAdmin");
+  const linkCongress = document.getElementById("linkCongress");
+  if (!box || !linkAdmin || !linkCongress || !window.Appwrite) {
+    console.warn("RUMR links: elementos ou SDK não encontrados.");
+    return;
+  }
 
   const client = new Appwrite.Client().setEndpoint(ENDPOINT).setProject(PROJECT_ID);
   const account = new Appwrite.Account(client);
@@ -26,11 +31,13 @@
       );
 
       const result = JSON.parse(execution.responseBody || "{}");
-      if (result.ok && result.isAdmin) {
-        box.hidden = false;
-      }
+      if (!result.ok) return;
+
+      linkAdmin.style.display = result.isAdmin ? "" : "none";
+      linkCongress.style.display = (result.isAdmin || result.isParlamentar) ? "" : "none";
+      box.style.display = (result.isAdmin || result.isParlamentar) ? "" : "none";
     })
-    .catch(() => {
-      // Sem sessão, o botão continua escondido.
+    .catch((error) => {
+      console.error("RUMR links:", error);
     });
 })();
